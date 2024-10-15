@@ -926,7 +926,7 @@ add_filter( 'atss_register_demos_list', 'sydney_atss_demos_list' );
 /**
  * Define actions that happen before import
  */
-function sydney_atss_setup_before_import( $demo_id ) {
+function sydney_atss_setup_before_import( $demo_id, $builder_type ) {
 
 	$all_modules = get_option( 'sydney-modules' );
 	$all_modules = ( is_array( $all_modules ) ) ? $all_modules : (array) $all_modules;
@@ -942,7 +942,7 @@ function sydney_atss_setup_before_import( $demo_id ) {
 		update_option( 'sydney-modules', array_merge( $all_modules, array( 'templates' => true ) ) );
 	}
 }
-add_action( 'atss_import_start', 'sydney_atss_setup_before_import' );
+add_action( 'atss_import_start', 'sydney_atss_setup_before_import', 10, 2 );
 
 /**
  * Define actions that happen after import

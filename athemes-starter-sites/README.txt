@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 6.6.0
 Requires PHP: 5.4
-Stable tag: 1.0.55
+Stable tag: 1.0.56
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,9 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+
+= 1.0.56 =
+* Added demo Fashion to Botiga
 
 = 1.0.52 =
 * Improved images url's replacing implementation
