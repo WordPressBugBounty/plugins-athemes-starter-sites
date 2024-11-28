@@ -595,7 +595,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor'    => array( 
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/leads/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/leads/widgets.wie',
-						'customizer' => 'https://athemes.com/themes-demo-content/sydney/leads/customizer.dat',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/leads/' . $customizer_file
 					),
 				),
 			),	
@@ -669,7 +669,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor'    => array( 
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/lms/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/lms/widgets.wie',
-						'customizer' => 'https://athemes.com/themes-demo-content/sydney/lms/customizer.dat',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/lms/' . $customizer_file
 					),
 				),
 			),				
