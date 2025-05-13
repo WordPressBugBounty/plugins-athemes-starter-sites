@@ -289,6 +289,34 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					),
 				),
 			),
+			'painting'   => array(
+				'name'       => esc_html__( 'Painting', 'sydney' ),
+				'type'       => 'pro',
+				'categories' => array( 'business' ),
+				'builders'   => array(
+					'elementor',
+				),
+				'preview'    => 'https://demo.athemes.com/sp-painting/',
+				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/painting/thumb.jpg',
+				'plugins'    => array_merge(
+					array(
+						array(	
+							'name'     => 'WPForms',
+							'slug'     => 'wpforms-lite',
+							'path'     => 'wpforms-lite/wpforms.php',
+							'required' => false
+						)
+					),
+					$plugins
+				),
+				'import'     => array(
+					'elementor'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/painting/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/painting/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/painting/customizer.dat',
+					),
+				),
+			),
 			'saas'   => array(
 				'name'       => esc_html__( 'SaaS (requires Elementor Containers)', 'sydney' ),
 				'type'       => 'pro',
@@ -491,6 +519,34 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					)
 				),
 			),	
+			'hair-salon'   => array(
+				'name'       => esc_html__( 'Hair Salon', 'sydney' ),
+				'type'       => 'pro',
+				'categories' => array( 'business' ),
+				'builders'   => array(
+					'elementor',
+				),
+				'preview'    => 'https://demo.athemes.com/sp-hair-salon/',
+				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/hair-salon/thumb.jpg',
+				'plugins'    => array_merge(
+					array(	
+						array(
+							'name'     => 'WPForms',
+							'slug'     => 'wpforms-lite',
+							'path'     => 'wpforms-lite/wpforms.php',
+							'required' => false
+							)
+					),
+					$plugins
+				),
+				'import'     => array(
+					'elementor'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/hair-salon/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/hair-salon/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/hair-salon/customizer.dat',
+					),
+				),
+			),			
 			'original'   => array(
 				'name'       => esc_html__( 'Original', 'sydney' ),
 				'type'       => 'pro',
@@ -1023,14 +1079,7 @@ function sydney_atss_setup_after_import( $demo_id ) {
 		update_option( 'athemes-addons-modules', array_merge( $aafe_modules, array( 'logo-carousel' => true ) ) );
 	}
 
-	if ( 'photography' === $demo_id ) {
-		$aafe_modules = get_option( 'athemes-addons-modules' );
-		$aafe_modules = ( is_array( $aafe_modules ) ) ? $aafe_modules : (array) $aafe_modules;
-
-		update_option( 'athemes-addons-modules', array_merge( $aafe_modules, array( 'wpforms' => true ) ) );
-	}
-
-	if ( 'leads' === $demo_id ) {
+	if ( 'leads' === $demo_id || 'hair-salon' === $demo_id || 'photography' === $demo_id ) {
 		$aafe_modules = get_option( 'athemes-addons-modules' );
 		$aafe_modules = ( is_array( $aafe_modules ) ) ? $aafe_modules : (array) $aafe_modules;
 
