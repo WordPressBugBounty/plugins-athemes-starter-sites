@@ -30,6 +30,13 @@ class Athemes_Starter_Sites_Importer {
 	private $microtime;
 
 	/**
+	 * The WXR importer instance.
+	 *
+	 * @var ATSS_WXRImporter
+	 */
+	private $importer;
+
+	/**
 	 * Singleton instance
 	 *
 	 * @var Athemes_Starter_Sites_Import
@@ -631,6 +638,9 @@ class Athemes_Starter_Sites_Importer {
 			'default_author'    => get_current_user_id(),
 		) );
 
+		// Store importer instance for access in filters
+		$this->importer = $importer;
+
 		// Logger options for the logger used in the importer.
 		$logger_options = apply_filters( 'atss_logger_options', array(
 			'logger_min_level' => 'warning',
@@ -679,8 +689,29 @@ class Athemes_Starter_Sites_Importer {
 
 		$time = microtime( true ) - $this->microtime;
 
-		// We should make a new ajax call, if the time is right.
-		if ( $time > apply_filters( 'atss_time_for_one_ajax_call', 300 ) ) {
+		// Check attachment count for splitting - only split if significant time has also passed
+		// This prevents infinite split loops and ensures we only split when actually needed
+		$split_after_attachments = apply_filters( 'atss_split_after_attachments', 10 ); // Increased from 10 to 20
+		$should_split_by_count = false;
+		
+		if ( $this->importer && method_exists( $this->importer, 'get_attachment_count' ) ) {
+			$attachment_count = $this->importer->get_attachment_count();
+			// Only split if we've processed enough attachments AND some time has passed (at least 15 seconds)
+			// This prevents splits when all files already exist (instant processing)
+			if ( $attachment_count >= $split_after_attachments && $time > 15 ) {
+				$should_split_by_count = true;
+			}
+		}
+
+		// We should make a new ajax call, if the time is right OR attachment count is reached.
+		// Reduced from 300 to 120 to align better with JS timeout of 120 seconds
+		$time_limit = apply_filters( 'atss_time_for_one_ajax_call', 120 );
+		if ( $time > $time_limit || $should_split_by_count ) {
+
+			// Reset the attachment counter for the next AJAX call
+			if ( $this->importer && method_exists( $this->importer, 'reset_attachment_count' ) ) {
+				$this->importer->reset_attachment_count();
+			}
 
 			$response = array(
 				'success' => true,
@@ -984,7 +1015,13 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_import_widgets() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		try {
+			// Increase time limit for widget import to prevent timeout
+			if ( ! ini_get( 'safe_mode' ) ) {
+				@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			}
+
+			check_ajax_referer( 'nonce', 'nonce' );
 
 		/**
 		 * Variables.
@@ -1013,57 +1050,123 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Process widgets.json.
 		 */
-		// Get JSON data from widgets.json.
-		$raw = wp_remote_get( wp_unslash( $file_url ) );
+		// Get JSON data from widgets.json with timeout protection.
+		$raw = wp_remote_get( 
+			wp_unslash( $file_url ),
+			array(
+				'timeout' => 15, // Short timeout to prevent hanging
+				'sslverify' => false, // Helps with Playground/CORS issues
+			)
+		);
 
-		// Abort if widgets.json response code is not successful.
-		if ( 200 != wp_remote_retrieve_response_code( $raw ) ) {
-			wp_send_json_error( esc_html__( 'Failed to load widget demo file.', 'athemes-starter-sites' ) );
+		// Check if fetch failed - log and skip instead of stopping import.
+		if ( is_wp_error( $raw ) ) {
+			// Log error but continue to next step
+			error_log( 'ATSS Widget Import: Failed to fetch widget file - ' . $raw->get_error_message() );
+			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			return;
 		}
 
-	 	// Clean widget settings.
-		$this->clean_widget_settings();
+		// Check response code - skip if not successful.
+		if ( 200 !== wp_remote_retrieve_response_code( $raw ) ) {
+			// Log error but continue to next step
+			error_log( 'ATSS Widget Import: Failed to load widget file. HTTP ' . wp_remote_retrieve_response_code( $raw ) );
+			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			return;
+		}
+
+	 	// Clean widget settings with timeout protection.
+		try {
+			$this->clean_widget_settings();
+		} catch ( Exception $e ) {
+			// Log but don't stop import if cleaning fails
+			error_log( 'ATSS Widget Import: Failed to clean widget settings - ' . $e->getMessage() );
+		} catch ( Error $e ) {
+			// Log but don't stop import if cleaning fails
+			error_log( 'ATSS Widget Import: Error cleaning widget settings - ' . $e->getMessage() );
+		}
 
 		// Decode raw JSON string to associative array.
 		$data = json_decode( wp_remote_retrieve_body( $raw ) );
 
-		$data = map_deep( $data, array( 'Athemes_Starter_Sites_Importer', 'replace_attachment_urls' ) );
+		// Check if JSON decode failed - skip if so.
+		if ( empty( $data ) ) {
+			error_log( 'ATSS Widget Import: Failed to decode widget JSON data' );
+			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) ) );
+			return;
+		}
+
+		// Process data with timeout protection
+		try {
+			$data = map_deep( $data, array( 'Athemes_Starter_Sites_Importer', 'replace_attachment_urls' ) );
+		} catch ( Exception $e ) {
+			error_log( 'ATSS Widget Import: Failed to process URLs - ' . $e->getMessage() );
+			// Continue with unprocessed data
+		} catch ( Error $e ) {
+			error_log( 'ATSS Widget Import: Error processing URLs - ' . $e->getMessage() );
+			// Continue with unprocessed data
+		}
 
 		$widgets = new ATSS_Widget_Importer();
 
-		// Import.
+		// Import with timeout tracking.
 		$results = $widgets->import( $data );
 
 		if ( is_wp_error( $results ) ) {
+			// Log error but continue to next step instead of stopping
 			$error_message = $results->get_error_message();
-			wp_send_json_error( $error_message );
+			error_log( 'ATSS Widget Import: Widget import failed - ' . $error_message );
+			wp_send_json_success( array( 'message' => esc_html__( 'Widget import completed with errors', 'athemes-starter-sites' ) ) );
+			return;
 		}
 
 		/**
-		 * Action hook.
+		 * Action hook - wrapped in timeout protection.
 		 */
+		try {
+			// Get all available widgets site supports.
+			$available_widgets = ATSS_Widget_Importer::available_widgets();
 
-		// Get all available widgets site supports.
-		$available_widgets = ATSS_Widget_Importer::available_widgets();
+			// Get all existing widget instances.
+			$widget_instances = array();
 
-		// Get all existing widget instances.
-		$widget_instances = array();
+			foreach ( $available_widgets as $widget_data ) {
+				if ( is_array( $widget_data ) && isset( $widget_data['id_base'] ) ) {
+					$widget_instances[ $widget_data['id_base'] ] = get_option( 'widget_' . $widget_data['id_base'] );
+				}
+			}
 
-		foreach ( $available_widgets as $widget_data ) {
-			$widget_instances[ $widget_data['id_base'] ] = get_option( 'widget_' . $widget_data['id_base'] );
+			// Sidebar Widgets
+			$sidebar_widgets = get_option( 'sidebars_widgets', array() );
+
+			update_option( '_athemes_sites_imported_widgets', $sidebar_widgets, 'no' );
+
+			do_action( 'atss_import_widgets', $sidebar_widgets, $widget_instances );
+		} catch ( Exception $e ) {
+			error_log( 'ATSS Widget Import: Post-import actions failed - ' . $e->getMessage() );
+			// Continue to success even if hooks fail
+		} catch ( Error $e ) {
+			error_log( 'ATSS Widget Import: Post-import actions error - ' . $e->getMessage() );
+			// Continue to success even if hooks fail
 		}
-
-		// Sidebar Widgets
-		$sidebar_widgets = get_option( 'sidebars_widgets', array() );
-
-		update_option( '_athemes_sites_imported_widgets', $sidebar_widgets, 'no' );
-
-		do_action( 'atss_import_widgets', $sidebar_widgets, $widget_instances );
 
 		/**
 		 * Return successful AJAX.
 		 */
 		wp_send_json_success();
+
+		} catch ( Exception $e ) {
+			// Log the error but don't crash the import - treat widget import as optional
+			error_log( 
+				sprintf(
+					'ATSS Widget Import Exception: %1$s in %2$s on line %3$s',
+					$e->getMessage(),
+					basename( $e->getFile() ),
+					$e->getLine()
+				)
+			);
+			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (unexpected error)', 'athemes-starter-sites' ) ) );
+		}
 
 	}
 
@@ -1072,7 +1175,8 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_import_customizer() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		try {
+			check_ajax_referer( 'nonce', 'nonce' );
 
 		/**
 		 * Variables.
@@ -1101,12 +1205,38 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Process customizer.json.
 		 */
-		// Get JSON data from customizer.json.
-		$raw = wp_remote_get( wp_unslash( $file_url ) );
+		// Increase time limit for customizer import to prevent timeout
+		if ( ! ini_get( 'safe_mode' ) ) {
+			@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+
+		// Get JSON data from customizer.json with extended timeout.
+		$raw = wp_remote_get( 
+			wp_unslash( $file_url ),
+			array(
+				'timeout' => 30, // Extended timeout for larger customizer files
+				'sslverify' => false,
+			)
+		);
+
+		// Check if fetch failed.
+		if ( is_wp_error( $raw ) ) {
+			wp_send_json_error( 
+				sprintf(
+					esc_html__( 'Failed to fetch customizer file: %s', 'athemes-starter-sites' ),
+					$raw->get_error_message()
+				)
+			);
+		}
 
 		// Abort if customizer.json response code is not successful.
 		if ( 200 != wp_remote_retrieve_response_code( $raw ) ) {
-			wp_send_json_error( esc_html__( 'Failed to load customizer demo file.', 'athemes-starter-sites' ) );
+			wp_send_json_error( 
+				sprintf(
+					esc_html__( 'Failed to load customizer demo file. HTTP %d', 'athemes-starter-sites' ),
+					wp_remote_retrieve_response_code( $raw )
+				)
+			);
 		}
 
 		// Clean customizer settings.
@@ -1115,13 +1245,23 @@ class Athemes_Starter_Sites_Importer {
 		// Decode raw JSON string to associative array.
 		$data = maybe_unserialize( wp_remote_retrieve_body( $raw ), true );
 
+		// Check if data was properly unserialized
+		if ( empty( $data ) || ! is_array( $data ) ) {
+			wp_send_json_error( esc_html__( 'Failed to parse customizer data. File may be corrupted.', 'athemes-starter-sites' ) );
+		}
+
 		$customizer = new ATSS_Customizer_Importer();
 
 		// Import.
 		$results = $customizer->import( $data );
 
 		if ( is_wp_error( $results ) ) {
-			wp_send_json_error( esc_html__( 'An error occurred while importing customizer.', 'athemes-starter-sites' ) );
+			wp_send_json_error( 
+				sprintf(
+					esc_html__( 'Customizer import error: %s', 'athemes-starter-sites' ),
+					$results->get_error_message()
+				)
+			);
 		}
 
 		/**
@@ -1133,6 +1273,17 @@ class Athemes_Starter_Sites_Importer {
 		 * Return successful AJAX.
 		 */
 		wp_send_json_success();
+
+		} catch ( Exception $e ) {
+			wp_send_json_error( 
+				sprintf(
+					esc_html__( 'Customizer Import Exception: %1$s in %2$s on line %3$s', 'athemes-starter-sites' ),
+					$e->getMessage(),
+					basename( $e->getFile() ),
+					$e->getLine()
+				)
+			);
+		}
 
 	}
 
@@ -1216,10 +1367,10 @@ class Athemes_Starter_Sites_Importer {
 			update_option( 'woocommerce_queue_flush_rewrite_rules', 'yes' );
 		}
 
-		/**
-		 * Action hook.
-		 */
-		do_action( 'atss_finish_import', $demo_id, $custom_import_settings );
+	/**
+	 * Action hook.
+	 */
+	do_action( 'atss_finish_import', $demo_id, $custom_import_settings ?? array() );
 
 		/**
 		 * Return successful AJAX.

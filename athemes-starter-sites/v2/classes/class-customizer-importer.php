@@ -41,6 +41,7 @@ class ATSS_Customizer_Importer {
 
 		// Setup internal vars.
 		$template = get_template();
+		$stylesheet = get_stylesheet();
 
 		// Data checks.
 		if ( ! is_array( $data ) && ( ! isset( $data['template'] ) || ! isset( $data['mods'] ) ) ) {
@@ -49,10 +50,22 @@ class ATSS_Customizer_Importer {
 				esc_html__( 'Error: The customizer import file is not in a correct format. Please make sure to use the correct customizer import file.', 'athemes-starter-sites' )
 			);
 		}
-		if ( $data['template'] !== $template ) {
+		
+		// Allow import if the template matches either:
+		// 1. The parent theme (template)
+		// 2. The current theme/child theme (stylesheet)
+		// 3. Apply filter to allow custom theme matching logic
+		$theme_matches = ( $data['template'] === $template || $data['template'] === $stylesheet );
+		$theme_matches = apply_filters( 'atss_customizer_import_theme_match', $theme_matches, $data['template'], $template, $stylesheet );
+		
+		if ( ! $theme_matches ) {
 			return new WP_Error(
 				'customizer_import_wrong_theme',
-				esc_html__( 'Error: The customizer import file is not suitable for current theme. You can only import customizer settings for the same theme or a child theme.', 'athemes-starter-sites' )
+				sprintf(
+					esc_html__( 'Error: The customizer import file is for "%s" theme but current theme is "%s". You can only import customizer settings for the same theme or a child theme.', 'athemes-starter-sites' ),
+					$data['template'],
+					$stylesheet
+				)
 			);
 		}
 

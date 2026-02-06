@@ -1117,12 +1117,16 @@ function sydney_atss_setup_after_import( $demo_id ) {
 
 	// Assign the menu.
 	$main_menu = get_term_by( 'name', 'Menu 1', 'nav_menu' );
-	set_theme_mod(
-		'nav_menu_locations',
-		array(
-			'primary' => $main_menu->term_id,
-		)
-	);
+
+	// Check if the menu was actually found before trying to use it.
+	if ( $main_menu ) {
+		set_theme_mod(
+			'nav_menu_locations',
+			array(
+				'primary' => $main_menu->term_id,
+			)
+		);
+	}
 
 	if ( 'finance' === $demo_id ) {
 		$aafe_modules = get_option( 'athemes-addons-modules' );
@@ -1280,3 +1284,27 @@ function sydney_atss_color_scheme_tooltips() {
 	return $tooltips;
 }
 add_filter( 'atss_register_customize_tooltips', 'sydney_atss_color_scheme_tooltips' );
+
+/**
+ * Allow Sydney and Sydney Pro to share customizer files
+ * This ensures cross-compatibility between Sydney (free) and Sydney Pro themes
+ */
+function sydney_atss_customizer_import_theme_match( $theme_matches, $import_template, $current_template, $current_stylesheet ) {
+	// If already matched, return true
+	if ( $theme_matches ) {
+		return true;
+	}
+
+	$sydney_themes = array( 'sydney', 'sydney-pro', 'sydney-pro-ii' );
+	
+	if ( in_array( $import_template, $sydney_themes, true ) && in_array( $current_template, $sydney_themes, true ) ) {
+		return true;
+	}
+	
+	if ( in_array( $import_template, $sydney_themes, true ) && in_array( $current_stylesheet, $sydney_themes, true ) ) {
+		return true;
+	}
+	
+	return $theme_matches;
+}
+add_filter( 'atss_customizer_import_theme_match', 'sydney_atss_customizer_import_theme_match', 10, 4 );

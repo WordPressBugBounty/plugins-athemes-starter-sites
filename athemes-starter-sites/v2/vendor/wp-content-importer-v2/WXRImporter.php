@@ -10,6 +10,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class ATSS_WXRImporter extends WP_Importer {
+	
+	/**
+	 * Count of attachments processed in current AJAX request
+	 *
+	 * @var int
+	 */
+	private $attachment_count = 0;
+
 	/**
 	 * Maximum supported WXR version
 	 */
@@ -1941,6 +1949,7 @@ class ATSS_WXRImporter extends WP_Importer {
 
 	/**
 	 * Attempt to download a remote file attachment.
+	 * ENHANCED: Added error recovery and crash prevention
 	 *
 	 * @param string $url  URL of item to fetch.
 	 * @param array  $post Attachment details.
@@ -1948,82 +1957,109 @@ class ATSS_WXRImporter extends WP_Importer {
 	 * @return array|WP_Error Local file location details on success, WP_Error otherwise
 	 */
 	protected function fetch_remote_file( $url, $post ) {
-		// extract the file name and extension from the url
-		$file_name = basename( $url );
+		// Wrap entire download in try-catch to prevent crashes
+		try {
+			// extract the file name and extension from the url
+			$file_name = basename( $url );
 
-		// force to use exists file.
-		$upload_dir  = wp_upload_dir( $post['upload_date'] );
-		$exists_file = $upload_dir['path'] .'/'. $file_name;
-		$exists_url  = $upload_dir['url'] .'/'. $file_name;
+			// force to use exists file.
+			$upload_dir  = wp_upload_dir( $post['upload_date'] );
+			$exists_file = $upload_dir['path'] .'/'. $file_name;
+			$exists_url  = $upload_dir['url'] .'/'. $file_name;
 
-		if ( file_exists( $exists_file ) ) {
-			$upload = array(
-				'file' => $exists_file,
-				'url'  => $exists_url,
-			);
-			return $upload;
-		}
+			if ( file_exists( $exists_file ) ) {
+				$upload = array(
+					'file' => $exists_file,
+					'url'  => $exists_url,
+				);
+				// Don't increment counter when file already exists
+				return $upload;
+			}
 
-		// get placeholder file in the upload dir with a unique, sanitized filename
-		$upload = wp_upload_bits( $file_name, 0, '', $post['upload_date'] );
+			// Increment attachment counter ONLY for actual downloads
+			// This prevents false positives when files are already cached
+			$this->attachment_count++;
 
-		if ( $upload['error'] ) {
-			return new WP_Error( 'upload_dir_error', $upload['error'] );
-		}
+			// get placeholder file in the upload dir with a unique, sanitized filename
+			$upload = wp_upload_bits( $file_name, 0, '', $post['upload_date'] );
 
-		// fetch the remote url and write it to the placeholder file
-		$response = wp_remote_get( $url, array(
-			'stream' => true,
-			'filename' => $upload['file'],
-		) );
+			if ( $upload['error'] ) {
+				return new WP_Error( 'upload_dir_error', $upload['error'] );
+			}
 
-		// request failed
-		if ( is_wp_error( $response ) ) {
-			unlink( $upload['file'] );
-			return $response;
-		}
+			// Set timeout
+			$timeout = apply_filters( 'atss_attachment_download_timeout', 30 );
+			
+			// fetch the remote url and write it to the placeholder file
+			$response = wp_remote_get( $url, array(
+				'stream'   => true,
+				'filename' => $upload['file'],
+				'timeout'  => $timeout,
+				'blocking' => true,
+			) );
 
-		$code = (int) wp_remote_retrieve_response_code( $response );
+			// request failed
+			if ( is_wp_error( $response ) ) {
+				@unlink( $upload['file'] );
+				// Return error but don't crash
+				return $response;
+			}
 
-		// make sure the fetch was successful
-		if ( $code !== 200 ) {
-			unlink( $upload['file'] );
-			return new WP_Error(
-				'import_file_error',
-				sprintf(
+			$code = (int) wp_remote_retrieve_response_code( $response );
+
+			// make sure the fetch was successful
+			if ( $code !== 200 ) {
+				@unlink( $upload['file'] );
+				$error_msg = sprintf(
 					__( 'Remote server returned %1$d %2$s for %3$s', 'wordpress-importer' ),
 					$code,
 					get_status_header_desc( $code ),
 					$url
-				)
-			);
+				);
+				return new WP_Error( 'import_file_error', $error_msg );
+			}
+
+			$filesize = @filesize( $upload['file'] );
+			$headers = wp_remote_retrieve_headers( $response );
+
+			// OCDI fix!
+			// Smaller images with server compression do not pass this rule.
+			// More info here: https://github.com/proteusthemes/WordPress-Importer/pull/2
+			//
+			// if ( isset( $headers['content-length'] ) && $filesize !== (int) $headers['content-length'] ) {
+			// 	unlink( $upload['file'] );
+			// 	return new WP_Error( 'import_file_error', __( 'Remote file is incorrect size', 'wordpress-importer' ) );
+			// }
+
+			if ( 0 === $filesize ) {
+				@unlink( $upload['file'] );
+				return new WP_Error( 'import_file_error', __( 'Zero size file downloaded', 'wordpress-importer' ) );
+			}
+
+			$max_size = (int) $this->max_attachment_size();
+			if ( ! empty( $max_size ) && $filesize > $max_size ) {
+				@unlink( $upload['file'] );
+				$message = sprintf( __( 'Remote file is too large, limit is %s', 'wordpress-importer' ), size_format( $max_size ) );
+				return new WP_Error( 'import_file_error', $message );
+			}
+
+			return $upload;
+			
+		} catch ( Exception $e ) {
+			// Catch any exceptions instead of crashing
+			if ( isset( $upload['file'] ) && file_exists( $upload['file'] ) ) {
+				@unlink( $upload['file'] );
+			}
+			$error_msg = sprintf( 'Exception downloading %s: %s', $url, $e->getMessage() );
+			return new WP_Error( 'import_exception', $error_msg );
+		} catch ( Error $e ) {
+			// Catch PHP 7+ fatal errors
+			if ( isset( $upload['file'] ) && file_exists( $upload['file'] ) ) {
+				@unlink( $upload['file'] );
+			}
+			$error_msg = sprintf( 'Error downloading %s: %s', $url, $e->getMessage() );
+			return new WP_Error( 'import_error', $error_msg );
 		}
-
-		$filesize = @filesize( $upload['file'] );
-		$headers = wp_remote_retrieve_headers( $response );
-
-		// OCDI fix!
-		// Smaller images with server compression do not pass this rule.
-		// More info here: https://github.com/proteusthemes/WordPress-Importer/pull/2
-		//
-		// if ( isset( $headers['content-length'] ) && $filesize !== (int) $headers['content-length'] ) {
-		// 	unlink( $upload['file'] );
-		// 	return new WP_Error( 'import_file_error', __( 'Remote file is incorrect size', 'wordpress-importer' ) );
-		// }
-
-		if ( 0 === $filesize ) {
-			unlink( $upload['file'] );
-			return new WP_Error( 'import_file_error', __( 'Zero size file downloaded', 'wordpress-importer' ) );
-		}
-
-		$max_size = (int) $this->max_attachment_size();
-		if ( ! empty( $max_size ) && $filesize > $max_size ) {
-			unlink( $upload['file'] );
-			$message = sprintf( __( 'Remote file is too large, limit is %s', 'wordpress-importer' ), size_format( $max_size ) );
-			return new WP_Error( 'import_file_error', $message );
-		}
-
-		return $upload;
 	}
 
 	protected function post_process() {
@@ -2618,5 +2654,23 @@ class ATSS_WXRImporter extends WP_Importer {
 	protected function mark_term_exists( $data, $term_id ) {
 		$exists_key = sha1( $data['taxonomy'] . ':' . $data['slug'] );
 		$this->exists['term'][ $exists_key ] = $term_id;
+	}
+
+	/**
+	 * Get attachment count for current request
+	 *
+	 * @return int
+	 */
+	public function get_attachment_count() {
+		return $this->attachment_count;
+	}
+
+	/**
+	 * Reset attachment count (called when starting a new AJAX request)
+	 *
+	 * @return void
+	 */
+	public function reset_attachment_count() {
+		$this->attachment_count = 0;
 	}
 }

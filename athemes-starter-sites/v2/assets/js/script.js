@@ -49,32 +49,57 @@ _dcs.account = 5598225;
       }, steps[step]);
       delete data.log;
       delete data.priority;
-      $.post(window.atss_localize.ajax_url, data, function (response) {
-        if (response.success) {
-          if (response.status && response.status === 'newAJAX') {
-            step--;
+
+      // Determine if this is a widget import step
+      var isWidgetStep = data.action === 'atss_import_widgets';
+
+      // Set longer timeout for import requests, especially widget imports
+      var ajaxSettings = {
+        url: window.atss_localize.ajax_url,
+        type: 'POST',
+        data: data,
+        timeout: isWidgetStep ? 180000 : 120000,
+        // 3 minutes for widgets, 2 minutes for others
+        success: function success(response) {
+          if (response.success) {
+            if (response.status && response.status === 'newAJAX') {
+              step--;
+            }
+            setTimeout(function () {
+              _atssAjaxImportRecursive($form, steps, step);
+            }, 500);
+          } else if (response.data) {
+            $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
+            $form.find('.atss-import-error-log').html(response.data);
+            $body.removeClass('atss-import-in-progress');
+          } else {
+            var errorLog = window.atss_localize.i18n.import_failed;
+            if (response) {
+              errorLog += '<div class="atss-import-error-response">' + _.escape(response) + '</div>';
+            }
+            $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
+            $form.find('.atss-import-error-log').html(errorLog);
+            $body.removeClass('atss-import-in-progress');
           }
-          setTimeout(function () {
-            _atssAjaxImportRecursive($form, steps, step);
-          }, 500);
-        } else if (response.data) {
-          $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
-          $form.find('.atss-import-error-log').html(response.data);
-          $body.removeClass('atss-import-in-progress');
-        } else {
-          var errorLog = window.atss_localize.i18n.import_failed;
-          if (response) {
-            errorLog += '<div class="atss-import-error-response">' + _.escape(response) + '</div>';
+        },
+        error: function error(xhr, status, _error) {
+          // Handle timeout and network errors gracefully for widget imports
+          if (isWidgetStep && (status === 'timeout' || status === 'error')) {
+            console.log('Widget import timed out or failed, continuing with next step...');
+
+            // Continue to next step instead of failing
+            setTimeout(function () {
+              _atssAjaxImportRecursive($form, steps, step);
+            }, 500);
+          } else {
+            // For other steps, show error as before
+            $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
+            $form.find('.atss-import-error-log').html(window.atss_localize.i18n.import_failed);
+            $body.removeClass('atss-import-in-progress');
           }
-          $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
-          $form.find('.atss-import-error-log').html(errorLog);
-          $body.removeClass('atss-import-in-progress');
         }
-      }).fail(function () {
-        $form.find('.atss-import-step-error').addClass('atss-active').siblings().removeClass('atss-active');
-        $form.find('.atss-import-error-log').html(window.atss_localize.i18n.import_failed);
-        $body.removeClass('atss-import-in-progress');
-      });
+      };
+      $.ajax(ajaxSettings);
     } else {
       $form.find('.atss-import-progress-label').html(window.atss_localize.i18n.import_finished);
       $form.find('.atss-import-progress-sublabel').html('100%');
@@ -232,8 +257,11 @@ _dcs.account = 5598225;
       });
       $atss.on('click', '.atss-import-with-content-type', function () {
         var isChecked = true;
+        var hasAnyChecked = false;
         $('.atss-import-with-content-type').each(function () {
-          if (!$(this).is(':checked')) {
+          if ($(this).is(':checked')) {
+            hasAnyChecked = true;
+          } else {
             isChecked = false;
           }
         });
@@ -241,6 +269,13 @@ _dcs.account = 5598225;
           $atss.find('.atss-import-content-select').removeClass('atss-hidden');
         } else {
           $atss.find('.atss-import-content-select').addClass('atss-hidden');
+        }
+
+        // Enable or disable Next button based on whether any content type is selected
+        if (hasAnyChecked) {
+          $atss.find('.atss-import-next-button').prop('disabled', false).removeClass('disabled');
+        } else {
+          $atss.find('.atss-import-next-button').prop('disabled', true).addClass('disabled');
         }
       });
       $atss.on('click', '.atss-import-start-button', function (e) {

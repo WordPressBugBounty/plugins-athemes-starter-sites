@@ -390,12 +390,12 @@ class ATSS_Demos_Page {
 												<?php esc_html_e( 'Content', 'athemes-starter-sites' ); ?>
 											</label>
 											<label>
-												<input type="checkbox" data-action="atss_import_widgets" data-priority="41" data-log="<?php esc_html_e( 'Importing widgets...', 'athemes-starter-sites' ); ?>" checked="checked" />
+												<input type="checkbox" data-action="atss_import_widgets" class="atss-import-with-content-type" data-priority="41" data-log="<?php esc_html_e( 'Importing widgets...', 'athemes-starter-sites' ); ?>" checked="checked" />
 												<span><i></i></span>
 												<?php esc_html_e( 'Widgets', 'athemes-starter-sites' ); ?>
 											</label>
 											<label>
-												<input type="checkbox" data-action="atss_import_customizer" data-priority="42" data-log="<?php esc_html_e( 'Importing customizer options...', 'athemes-starter-sites' ); ?>" checked="checked" />
+												<input type="checkbox" data-action="atss_import_customizer" class="atss-import-with-content-type" data-priority="42" data-log="<?php esc_html_e( 'Importing customizer options...', 'athemes-starter-sites' ); ?>" checked="checked" />
 												<span><i></i></span>
 												<?php esc_html_e( 'Customizer', 'athemes-starter-sites' ); ?>
 											</label>

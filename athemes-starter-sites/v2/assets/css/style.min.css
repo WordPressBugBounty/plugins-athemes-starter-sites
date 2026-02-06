@@ -57,6 +57,7 @@
 .atss-import-step.atss-active{display:block}
 .atss-import-actions{display:-webkit-box;display:-ms-flexbox;display:flex;grid-gap:10px;-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;border-top:1px solid #d9d9d9;padding:16px}
 .atss-import-actions-column{-webkit-box-orient:vertical;-webkit-box-direction:normal;-ms-flex-direction:column;flex-direction:column}
+.atss-import-next-button.disabled,.atss-import-next-button:disabled{opacity:.5;cursor:not-allowed;pointer-events:none}
 .atss-import-image-select{display:-webkit-box;display:-ms-flexbox;display:flex;grid-gap:15px}
 .atss-import-image-select figure{-webkit-box-flex:1;-ms-flex:1;flex:1;display:-webkit-box;display:-ms-flexbox;display:flex;position:relative;grid-gap:10px;-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;-webkit-box-align:center;-ms-flex-align:center;align-items:center;padding:5px;min-height:150px;border-radius:4px;border:1px solid #d4d4d4}
 .atss-import-image-select figure:before{display:none;content:"";font-family:dashicons;position:absolute;top:0;right:0;width:20px;height:20px;-webkit-box-align:center;-ms-flex-align:center;align-items:center;-webkit-box-pack:center;-ms-flex-pack:center;justify-content:center;color:#fff;background-color:#274bdb}
