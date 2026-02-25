@@ -229,7 +229,7 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 
 			wp_localize_script( 'athemes-starter-sites', 'atss_localize', array(
 				'ajax_url'       => admin_url( 'admin-ajax.php' ),
-				'nonce'          => wp_create_nonce( 'nonce' ),
+				'nonce'          => wp_create_nonce( 'atss_legacy_import' ),
 				'failed_message' => esc_html__( 'Something went wrong, contact support.', 'athemes-starter-sites' ),
 			) );
 

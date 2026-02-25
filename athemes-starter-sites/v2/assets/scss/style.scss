@@ -806,6 +806,15 @@
   }
 }
 
+/* Loading state for wizard redirect */
+.atss-wizard-redirect-loading {
+
+  .atss-import,
+  .atss-demo-item {
+    pointer-events: none;
+  }
+}
+
 /* RTL Support */
 html[dir="rtl"]{
 

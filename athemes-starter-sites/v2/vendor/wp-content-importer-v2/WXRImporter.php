@@ -1211,9 +1211,10 @@ class ATSS_WXRImporter extends WP_Importer {
 	/**
 	 * Process and import post meta items.
 	 *
-	 * @param array $meta List of meta data arrays
-	 * @param int $post_id Post to associate with
-	 * @param array $post Post data
+	 * @param array $meta List of meta data arrays.
+	 * @param int   $post_id Post to associate with.
+	 * @param array $post Post data.
+	 *
 	 * @return int|WP_Error Number of meta items imported on success, error otherwise.
 	 */
 	protected function process_post_meta( $meta, $post_id, $post ) {
@@ -1222,47 +1223,141 @@ class ATSS_WXRImporter extends WP_Importer {
 		}
 
 		foreach ( $meta as $meta_item ) {
-			/**
-			 * Pre-process post meta data.
-			 *
-			 * @param array $meta_item Meta data. (Return empty to skip.)
-			 * @param int $post_id Post the meta is attached to.
-			 */
 			$meta_item = apply_filters( 'wxr_importer.pre_process.post_meta', $meta_item, $post_id, $this->base_url );
 			if ( empty( $meta_item ) ) {
 				return false;
 			}
 
-			$key = apply_filters( 'import_post_meta_key', $meta_item['key'], $post_id, $post );
+			$key   = apply_filters( 'import_post_meta_key', $meta_item['key'], $post_id, $post );
 			$value = false;
 
 			if ( '_edit_last' === $key ) {
 				$value = intval( $meta_item['value'] );
+
 				if ( ! isset( $this->mapping['user'][ $value ] ) ) {
-					// Skip!
 					continue;
 				}
 
 				$value = $this->mapping['user'][ $value ];
 			}
 
-			if ( $key ) {
-				// export gets meta straight from the DB so could have a serialized string
-				if ( ! $value ) {
-					$value = maybe_unserialize( $meta_item['value'] );
-				}
+			if ( ! $key ) {
+				continue;
+			}
 
-				add_post_meta( $post_id, wp_slash( $key ), wp_slash_strings_only( $value ) );
-				do_action( 'import_post_meta', $post_id, $key, $value );
+			if ( ! $value ) {
+				$value = maybe_unserialize( $meta_item['value'] );
+			}
 
-				// if the post has a featured image, take note of this in case of remap
-				if ( '_thumbnail_id' === $key ) {
-					$this->featured_images[ $post_id ] = (int) $value;
-				}
+			// Hydrate missing Elementor media URLs (e.g. background_image.url = "").
+			if ( '_elementor_data' === $key && is_string( $value ) && $value !== '' ) {
+				$value = $this->atss_hydrate_elementor_media_urls( $value );
+			}
+
+			add_post_meta( $post_id, wp_slash( $key ), wp_slash_strings_only( $value ) );
+			do_action( 'import_post_meta', $post_id, $key, $value );
+
+			if ( '_thumbnail_id' === $key ) {
+				$this->featured_images[ $post_id ] = (int) $value;
 			}
 		}
 
 		return true;
+	}
+
+	/**
+	 * Hydrate Elementor media URLs when JSON contains attachment IDs but empty URLs.
+	 *
+	 * @param string $elementor_json Elementor JSON string.
+	 *
+	 * @return string
+	 */
+	private function atss_hydrate_elementor_media_urls( $elementor_json ) {
+		$data = json_decode( $elementor_json, true );
+
+		if ( ! is_array( $data ) ) {
+			return $elementor_json;
+		}
+
+		$data = $this->atss_walk_elementor_elements( $data );
+
+		$encoded = wp_json_encode( $data );
+
+		return is_string( $encoded ) && $encoded !== '' ? $encoded : $elementor_json;
+	}
+
+	/**
+	 * Recursively walk Elementor data and fill missing media URLs by attachment ID.
+	 *
+	 * @param mixed $node Current node.
+	 *
+	 * @return mixed
+	 */
+	private function atss_walk_elementor_elements( $node ) {
+		if ( ! is_array( $node ) ) {
+			return $node;
+		}
+
+		// If this node looks like a media array, hydrate it.
+		$node = $this->atss_hydrate_media_array( $node );
+
+		foreach ( $node as $k => $v ) {
+			if ( is_array( $v ) ) {
+				$node[ $k ] = $this->atss_walk_elementor_elements( $v );
+			}
+		}
+
+		return $node;
+	}
+
+	/**
+	 * Hydrate common Elementor media arrays (background_image, image, etc.).
+	 *
+	 * Expected shape:
+	 * [
+	 *   'url'    => '',
+	 *   'id'     => 88,
+	 *   'source' => 'library',
+	 *   ...
+	 * ]
+	 *
+	 * @param array $arr Array node.
+	 *
+	 * @return array
+	 */
+	private function atss_hydrate_media_array( array $arr ) {
+		// Must have an attachment ID to be actionable.
+		if ( ! array_key_exists( 'id', $arr ) ) {
+			return $arr;
+		}
+
+		$attachment_id = absint( $arr['id'] );
+
+		if ( $attachment_id < 1 ) {
+			return $arr;
+		}
+
+		// Only normalize WordPress library media to avoid touching external URLs.
+		$source = isset( $arr['source'] ) ? (string) $arr['source'] : '';
+
+		if ( $source !== '' && $source !== 'library' ) {
+			return $arr;
+		}
+
+		$attachment_url = wp_get_attachment_url( $attachment_id );
+
+		if ( ! is_string( $attachment_url ) || $attachment_url === '' ) {
+			return $arr;
+		}
+
+		$current_url = isset( $arr['url'] ) ? (string) $arr['url'] : '';
+
+		// Normalize: if Elementor stored a stale/incorrect URL, force it to match the attachment ID.
+		if ( $current_url !== $attachment_url ) {
+			$arr['url'] = $attachment_url;
+		}
+
+		return $arr;
 	}
 
 	/**

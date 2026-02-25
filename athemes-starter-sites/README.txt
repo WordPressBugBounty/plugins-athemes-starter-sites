@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 6.8.3
 Requires PHP: 5.4
-Stable tag: 1.1.5
+Stable tag: 1.1.6
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -30,7 +30,7 @@ Make your starter site really yours. Tweak your site with different fonts, color
 
 = Let's go live =
 
-Ready to grow your business with a website that stands out from the crowd? Publish your page in just a few clicks. 
+Ready to grow your business with a website that stands out from the crowd? Publish your page in just a few clicks.
 
 **Happy Building!**
 
@@ -44,7 +44,7 @@ Ready to grow your business with a website that stands out from the crowd? Publi
 
 = Will this Starter Site plugin work with my theme? =
 
-The starter sites are built using Sydney, Botiga and Airi. We suggest picking your favourite and using that. 
+The starter sites are built using Sydney, Botiga and Airi. We suggest picking your favourite and using that.
 
 = Are there any FREE starter sites? =
 
@@ -67,6 +67,10 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+
+= 1.1.6 =
+* Onboarding wizard support for Sydney
+* Missing Elementor media urls fix
 
 = 1.1.3 =
 * Improve content and widget import process

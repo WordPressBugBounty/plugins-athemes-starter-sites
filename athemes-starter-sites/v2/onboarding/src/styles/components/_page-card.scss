@@ -1,0 +1,173 @@
+.atss-page-card {
+	background-color: var(--atss-color-background-white);
+	border: 1px solid var(--atss-color-border-divider);
+	border-radius: var(--atss-radius-md);
+	overflow: hidden;
+	transition: all 0.2s ease;
+	display: flex;
+	flex-direction: column;
+	width: 136px;
+	height: 165px;
+	flex-shrink: 0;
+
+	&--selected {
+		border-color: var(--atss-color-accent);
+		outline: 2px solid var(--atss-color-border-focus);
+	}
+}
+
+.atss-page-card__preview {
+	position: relative;
+	width: 136px;
+	height: 129px;
+	overflow: hidden;
+	background-color: var(--atss-color-background-surface);
+	flex-shrink: 0;
+}
+
+// Thumbnail image (fallback when iframe fails or missing)
+.atss-page-card__thumbnail {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.atss-page-card__loading {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 3;
+
+	svg {
+		width: 24px;
+		height: 24px;
+	}
+}
+
+.atss-page-card__iframe {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 1440px; /* Fixed width for consistent rendering */
+	height: 2000px;
+	border: none;
+	pointer-events: none;
+	transform: scale(0.0965); /* Scale: 139px / 1440px */
+	transform-origin: top left;
+}
+
+// Dark overlay covering the entire preview area on hover
+.atss-page-card__dark-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background-color: rgba(0, 0, 0, 20%);
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	z-index: 4;
+	pointer-events: none;
+}
+
+.atss-page-card:hover .atss-page-card__dark-overlay {
+	opacity: 1;
+}
+
+// Hover overlay with magnifying glass icon
+.atss-page-card__hover-overlay {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	width: 42px;
+	height: 42px;
+	background-color: #101517;
+	opacity: 0;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: opacity 0.2s ease;
+	z-index: 5;
+	pointer-events: none;
+
+	svg {
+		width: 20px;
+		height: 20px;
+		fill: white;
+	}
+}
+
+.atss-page-card:hover .atss-page-card__hover-overlay {
+	opacity: 0.7;
+}
+
+// Checkbox overlay in top-right corner
+.atss-page-card__checkbox {
+	position: absolute;
+	top: 0;
+	right: 1px;
+	width: 20px;
+	height: 20px;
+	background-color: var(--atss-color-background-white);
+	border: 1px solid var(--atss-color-border-divider);
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	cursor: pointer;
+	z-index: 10;
+
+	&:hover {
+		border-color: var(--atss-color-accent);
+	}
+
+	// Checked state
+	&--checked {
+		background-color: var(--atss-color-accent);
+		border-color: var(--atss-color-accent);
+	}
+}
+
+.atss-page-card__checkmark {
+	display: block;
+	flex-shrink: 0;
+}
+
+.atss-page-card__info {
+	padding: var(--atss-spacing-sm);
+	border-top: 1px solid var(--atss-color-border-divider);
+	background-color: var(--atss-color-background-white);
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+// Page title text
+.atss-page-card__title {
+	color: var(--atss-color-text-heading);
+	font-size: var(--atss-font-size-xs);
+	text-align: center;
+	width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.atss-pages-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, 136px);
+	gap: var(--atss-spacing-md) var(--atss-spacing-sm);
+	width: 100%;
+	justify-content: start;
+}

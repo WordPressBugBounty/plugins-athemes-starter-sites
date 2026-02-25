@@ -26,6 +26,13 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 		 */
 		public $theme = '';
 
+	/**
+	 * Onboarding wizard instance.
+	 *
+	 * @var ATSS_Onboarding_Wizard|null
+	 */
+	private $onboarding_wizard = null;
+
 		/**
 		 * Initial
 		 */
@@ -37,6 +44,9 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 			require_once ATSS_PATH . 'v2/classes/class-customizer-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-core-helpers.php';
+
+			// Optional onboarding wizard (opt-in via filter).
+			add_action( 'init', array( $this, 'maybe_init_onboarding_wizard' ) );
 
 			// Actions.
 			add_action( 'plugins_loaded', array( $this, 'theme_configs' ) );
@@ -59,6 +69,22 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 				require_once ATSS_PATH . 'v2/themes/sydney.php';
 			}
 
+		}
+
+		/**
+		 * Conditionally boot the onboarding wizard when enabled by theme.
+		 */
+		public function maybe_init_onboarding_wizard() {
+			$enable_wizard = apply_filters( 'atss_enable_onboarding_wizard', false );
+
+			if ( ! $enable_wizard || ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+				return;
+			}
+
+			require_once ATSS_PATH . 'v2/onboarding/class-onboarding-wizard.php';
+
+			$this->onboarding_wizard = new ATSS_Onboarding_Wizard();
+			$this->onboarding_wizard->init();
 		}
 
 		/**
@@ -99,13 +125,15 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 			wp_localize_script( 'athemes-starter-sites-v2', 'atss_localize', array(
 				'ajax_url'          => admin_url( 'admin-ajax.php' ),
 				'plugin_url'        => ATSS_URL,
-				'nonce'             => wp_create_nonce( 'nonce' ),
+				'nonce'             => wp_create_nonce( 'atss_legacy_import' ),
 				'demos'             => $demos,
 				'theme_name'        => $theme->name,
 				'imported'          => get_option( 'atss_current_starter', '' ),
-				'settings'          => $settings,
-				'tooltips'			=> $tooltips,
-				'i18n'              => array(
+				'settings'                => $settings,
+				'tooltips'                => $tooltips,
+				'onboardingWizardActive'  => ! empty( $this->onboarding_wizard ),
+				'onboardingWizardUrl'     => admin_url( 'admin.php?page=atss-onboarding-wizard' ),
+				'i18n'                    => array(
 					'import_failed'   => esc_html__( 'Something went wrong, contact support.', 'athemes-starter-sites' ),
 					'import_finished' => esc_html__( 'Finished!', 'athemes-starter-sites' ),
 					'invalid_email'   => esc_html__( 'Enter a valid email address!', 'athemes-starter-sites' ),

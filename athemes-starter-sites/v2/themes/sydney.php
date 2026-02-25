@@ -6,10 +6,10 @@
 if ( !function_exists( 'sydney_atss_demos_list') ) {
 	function sydney_atss_demos_list() {
 
-		$customizer_file = 'customizer.dat'; 
-		
+		$customizer_file = 'customizer.dat';
+
 		$is_pro = defined( 'SYDNEY_PRO_VERSION' ) ? true : false;
-		
+
 		if ( $is_pro ) {
 			$customizer_file = 'customizer-pro.dat';
 		}
@@ -25,6 +25,30 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 			);
 		}
 
+		$plugins[] = array(
+			'name'     => 'WPForms',
+			'slug'     => 'wpforms-lite',
+			'path'     => 'wpforms-lite/wpforms.php',
+			'required' => false,
+			'recommended' => true,
+		);
+
+		$plugins[] = array(
+			'name'     => 'WP Mail SMTP',
+			'slug'     => 'wp-mail-smtp',
+			'path'     => 'wp-mail-smtp/wp_mail_smtp.php',
+			'required' => false,
+			'recommended' => false,
+		);
+
+		$plugins[] = array(
+			'name'     => 'All in One SEO',
+			'slug'     => 'all-in-one-seo-pack',
+			'path'     => 'all-in-one-seo-pack/all_in_one_seo_pack.php',
+			'required' => false,
+			'recommended' => false,
+		);
+
 		$demos = array(
 			'main-pro' => array(
 				'name'       => esc_html__( 'Agency', 'sydney' ),
@@ -36,17 +60,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-main/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/main-pro/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/main-pro/content.xml',
@@ -73,17 +87,18 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'plugins'    => array_merge(
 					array(
 						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
-						array(
 							'name'     => 'aThemes Addons for Elementor Lite',
 							'slug'     => 'athemes-addons-for-elementor-lite',
 							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
 							'required' => false,
 							'builder'  => 'elementor'
+						),
+						array(
+							'name'     => 'aThemes Blocks',
+							'slug'     => 'athemes-blocks',
+							'path'     => 'athemes-blocks/athemes-blocks.php',
+							'required' => false,
+							'builder'  => 'gutenberg'
 						),
 					),
 					$plugins
@@ -100,7 +115,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/main-free/' . $customizer_file
 					)
 				),
-			),						
+			),
 			'fashion'     => array(
 				'name'       => esc_html__( 'Fashion Shop', 'sydney' ),
 				'type'       => 'free',
@@ -161,12 +176,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'plugins'    => array_merge(
 					array(
 						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
-						array(
 							'name'     => 'aThemes Addons for Elementor Lite',
 							'slug'     => 'athemes-addons-for-elementor-lite',
 							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
@@ -177,7 +186,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					$plugins
 				),
 				'import'     => array(
-					'elementor'    => array(		
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/plumber/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/plumber/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/plumber/' . $customizer_file
@@ -237,12 +246,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'plugins'    => array_merge(
 					array(
 						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
-						array(
 							'name'     => 'aThemes Addons for Elementor Lite',
 							'slug'     => 'athemes-addons-for-elementor-lite',
 							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
@@ -264,7 +267,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/photography/' . $customizer_file
 					),
 				),
-			),	
+			),
 			'interior-design'    => array(
 				'name'       => esc_html__( 'Interior Design', 'sydney' ),
 				'type'       => 'pro',
@@ -273,16 +276,10 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor',
 					'gutenberg',
 				),
-				'preview'    => 'https://demo.athemes.com/sydney-interior-design/',
+				'preview'    => 'https://demo.athemes.com/sp-interior-design/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/interior-design/thumb.jpg',
 				'plugins'    => array_merge(
 					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
 						array(
 							'name'     => 'aThemes Addons for Elementor Lite',
 							'slug'     => 'athemes-addons-for-elementor-lite',
@@ -316,17 +313,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-crypto/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/crypto/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/crypto/content.xml',
@@ -350,17 +337,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-painting/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/painting/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(	
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/painting/content.xml',
@@ -384,17 +361,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-saas/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/saas/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/saas/content.xml',
@@ -418,19 +385,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-charity/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/charity/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/charity/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/charity/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/charity/customizer.dat',
@@ -452,19 +409,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-hotel/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/hotel/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/hotel/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/hotel/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/hotel/customizer.dat',
@@ -486,19 +433,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-wedding-planner/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/wedding-planner/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/wedding-planner/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/wedding-planner/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/wedding-planner/customizer.dat',
@@ -520,19 +457,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-news/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/news/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/news/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/news/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/news/customizer.dat',
@@ -554,17 +481,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/construction/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/construction/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/construction/content.xml',
@@ -596,17 +513,11 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 							'path'     => 'woocommerce/woocommerce.php',
 							'required' => true,
 						),
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
 					),
 					$plugins
 				),
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/cafe/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/cafe/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/cafe/customizer.dat',
@@ -617,7 +528,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/cafe/customizer.dat'
 					),
 				),
-			),	
+			),
 			'hair-salon'   => array(
 				'name'       => esc_html__( 'Hair Salon', 'sydney' ),
 				'type'       => 'pro',
@@ -628,17 +539,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-hair-salon/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/hair-salon/thumb.jpg',
-				'plugins'    => array_merge(
-					array(	
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-							)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/hair-salon/content.xml',
@@ -651,7 +552,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/hair-salon/customizer.dat'
 					),
 				),
-			),			
+			),
 			'original'   => array(
 				'name'       => esc_html__( 'Original', 'sydney' ),
 				'type'       => 'pro',
@@ -674,12 +575,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 							'slug'     => 'smart-slider-3',
 							'path'     => 'smart-slider-3/smart-slider-3.php',
 							'required' => false,
-						),		
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
 						),
 					),
 					$plugins
@@ -702,19 +597,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/gardening/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/gardening/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/gardening/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/gardening/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gardening/customizer.dat',
@@ -738,12 +623,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'plugins'    => array_merge(
 					array(
 						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
-						array(
 							'name'     => 'Hubspot',
 							'slug'     => 'leadin',
 							'path'     => 'leadin/leadin.php',
@@ -755,12 +634,12 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
 							'required' => false,
 							'builder'  => 'elementor'
-						),			
+						),
 					),
 					$plugins
 				),
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/leads/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/leads/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/leads/' . $customizer_file
@@ -771,7 +650,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/leads/' . $customizer_file
 					),
 				),
-			),	
+			),
 			'learndash-lms'    => array(
 				'name'       => esc_html__( 'eLearning (LearnDash)', 'sydney' ),
 				'type'       => 'pro',
@@ -782,19 +661,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sydney-lms-learndash/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/lms/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),									
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/learndash-lms/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/learndash-lms/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/learndash-lms/customizer.dat',
@@ -805,7 +674,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/learndash-lms/customizer.dat'
 					),
 				),
-			),	
+			),
 			'tutor-lms'    => array(
 				'name'       => esc_html__( 'eLearning (Tutor)', 'sydney' ),
 				'type'       => 'free',
@@ -818,12 +687,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/lms/thumb.jpg',
 				'plugins'    => array_merge(
 					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						),
 						array(
 							'name'     => 'Tutor',
 							'slug'     => 'tutor',
@@ -842,12 +705,12 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
 							'required' => false,
 							'builder'  => 'elementor'
-						),										
+						),
 					),
 					$plugins
 				),
 				'import'     => array(
-					'elementor'    => array( 
+					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/lms/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/lms/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/lms/' . $customizer_file
@@ -858,7 +721,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/tutor-lms/' . $customizer_file
 					),
 				),
-			),				
+			),
 			'blogpro'   => array(
 				'name'       => esc_html__( 'Blog', 'sydney' ),
 				'type'       => 'pro',
@@ -886,17 +749,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp--restaurant/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/restaurant/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor' => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/restaurant/content.xml',
@@ -920,17 +773,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-yoga/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/yoga/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor' => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/yoga/content.xml',
@@ -954,17 +797,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				),
 				'preview'    => 'https://demo.athemes.com/sp-business/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/business/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor' => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/business/content.xml',
@@ -1009,19 +842,9 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor',
 					'gutenberg',
 				),
-				'preview'    => 'https://demo.athemes.com/sp-resume/',
+				'preview'    => 'https://demo.athemes.com/sp--resume/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/resume/thumb.jpg',
-				'plugins'    => array_merge(
-					array(
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
-					),
-					$plugins
-				),
+				'plugins'    => $plugins,
 				'import'     => array(
 					'elementor'    => array(
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/resume/content.xml',
@@ -1034,7 +857,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/resume/customizer.dat'
 					),
 				),
-			),	
+			),
 			'author'       => array(
 				'name'       => esc_html__( 'Author', 'sydney' ),
 				'type'       => 'pro',
@@ -1053,12 +876,6 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 							'path'     => 'woocommerce/woocommerce.php',
 							'required' => false,
 						),
-						array(
-							'name'     => 'WPForms',
-							'slug'     => 'wpforms-lite',
-							'path'     => 'wpforms-lite/wpforms.php',
-							'required' => false
-						)
 					),
 					$plugins
 				),
@@ -1074,7 +891,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/author/customizer.dat'
 					),
 				),
-			),			
+			),
 		);
 
 		//Move the main free demo to the first position if the pro version is not active.
@@ -1155,7 +972,7 @@ function sydney_atss_setup_after_import( $demo_id ) {
 				'primary' => $main_menu->term_id,
 			)
 		);
-	}	
+	}
 
 	if ( 'hotel' === $demo_id ) {
 		$all_modules = get_option( 'sydney-modules' );
@@ -1168,9 +985,9 @@ function sydney_atss_setup_after_import( $demo_id ) {
 				'id'                => 'global',
 				'footer'            => '192',
 				'footer_builder'    => 'elementor',
-			)		
+			)
 		);
-		
+
 		update_option('sydney_template_builder_data', $template_builder_data);
 	}
 
@@ -1179,6 +996,14 @@ function sydney_atss_setup_after_import( $demo_id ) {
 		$aafe_modules = ( is_array( $aafe_modules ) ) ? $aafe_modules : (array) $aafe_modules;
 
 		update_option( 'athemes-addons-modules', array_merge( $aafe_modules, array( 'testimonials' => true ) ) );
+
+		$main_menu = get_term_by( 'name', 'Main', 'nav_menu' );
+		set_theme_mod(
+			'nav_menu_locations',
+			array(
+				'primary' => $main_menu->term_id,
+			)
+		);
 
 		// Assign footer menus to widgets
 		$footer_menus = array(
@@ -1201,7 +1026,7 @@ function sydney_atss_setup_after_import( $demo_id ) {
 				}
 			}
 		}
-		
+
 	}
 
 	if ( 'fashion' === $demo_id ) {
@@ -1257,7 +1082,7 @@ function sydney_atss_setup_after_import( $demo_id ) {
 				update_option( 'woocommerce_shop_page_id', $shop_page->ID );
 
 				break;
-			
+
 		}
 	}
 
@@ -1296,15 +1121,15 @@ function sydney_atss_customizer_import_theme_match( $theme_matches, $import_temp
 	}
 
 	$sydney_themes = array( 'sydney', 'sydney-pro', 'sydney-pro-ii' );
-	
+
 	if ( in_array( $import_template, $sydney_themes, true ) && in_array( $current_template, $sydney_themes, true ) ) {
 		return true;
 	}
-	
+
 	if ( in_array( $import_template, $sydney_themes, true ) && in_array( $current_stylesheet, $sydney_themes, true ) ) {
 		return true;
 	}
-	
+
 	return $theme_matches;
 }
 add_filter( 'atss_customizer_import_theme_match', 'sydney_atss_customizer_import_theme_match', 10, 4 );

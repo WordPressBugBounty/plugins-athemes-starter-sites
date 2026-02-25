@@ -1,0 +1,56 @@
+/**
+ * PluginSummary Component Styles
+ */
+
+.atss-plugin-summary {
+	margin-top: var(--atss-spacing-xxl);
+
+	&__description {
+		margin: 0 0 var(--atss-spacing-md);
+		color: var(--atss-color-text-tertiary, #787C82);
+		text-align: left;
+	}
+
+	&__empty {
+		margin: 0;
+		color: var(--atss-color-text-tertiary, #787C82);
+		font-style: italic;
+	}
+
+	&__list {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--atss-spacing-sm, 12px);
+	}
+
+	&__pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 4px 8px;
+		border: 1px solid var(--atss-color-border-divider);
+		border-radius: 4px;
+		background: var(--atss-color-background-white, #fff);
+	}
+
+	&__icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		flex-shrink: 0;
+
+		svg {
+			width: 16px;
+			height: 16px;
+			fill: currentColor;
+		}
+	}
+
+	&__name {
+		font-size: 12px;
+		font-weight: 400;
+		color: var(--atss-color-text-title, #101517);
+	}
+}

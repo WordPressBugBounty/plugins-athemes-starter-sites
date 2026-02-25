@@ -1,0 +1,156 @@
+/**
+ * FeatureCard Component Styles
+ */
+
+.atss-feature-card {
+	position: relative;
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 16px;
+	background: var(--atss-color-background-white, #fff);
+	border: 1px solid var(--atss-color-background-surface, #F0F0F1);
+	border-radius: 8px;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+	cursor: pointer;
+
+	&:hover {
+		border-color: var(--atss-color-accent, #335EEA);
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+	}
+
+	&--selected {
+		border-color: var(--atss-color-accent, #335EEA);
+	}
+
+	&--disabled {
+		opacity: 0.7;
+		cursor: not-allowed;
+
+		&:hover {
+			border-color: var(--atss-color-border, rgb(240, 240, 241));
+			box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+		}
+	}
+
+	&__content {
+		display: flex;
+		align-items: flex-start;
+		gap: 16px;
+		flex: 1;
+	}
+
+	&__icon {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 42px;
+		height: 42px;
+		background: var(--atss-color-accent-light, #F1F4FF);
+		border-radius: 8px;
+		flex-shrink: 0;
+
+		svg {
+			width: 16px;
+			height: 16px;
+			color: var(--atss-color-accent, #335EEA);
+			fill: currentColor;
+		}
+	}
+
+	&__text {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		flex: 1;
+		min-width: 0; // Allow text to shrink
+	}
+
+	&__title-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		flex-wrap: wrap;
+	}
+
+	&__title {
+		margin: 0;
+		font-size: 16px;
+		font-weight: 500;
+		line-height: 1.375; // 22px
+		color: var(--atss-color-text-title, #101517);
+	}
+
+	&__description {
+		margin: 0;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.43; // ~20px
+		color: var(--atss-color-text-tertiary, #787C82);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		text-align: left;
+	}
+
+	&__badge {
+		display: inline-flex;
+		align-items: center;
+		padding: 6px 8px;
+		font-size: 8px;
+		font-weight: 600;
+		line-height: 1;
+		letter-spacing: 0.5px;
+		text-transform: uppercase;
+		border-radius: 3px;
+
+		&--recommended {
+			background: var(--atss-badge-green-background, #E3FCE7);
+			color: var(--atss-badge-green-text, #008A20);
+		}
+
+		&--required {
+			background: var(--atss-badge-red-background, #FEE2E2);
+			color: var(--atss-badge-red-text, #DC2626);
+		}
+	}
+
+	&__checkbox {
+		position: relative;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		background: var(--atss-color-background-white, #fff);
+		border: 2px solid var(--atss-color-border, #C3C4C7);
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		flex-shrink: 0;
+		margin-top: 2px; // Align with title baseline
+
+		&:hover {
+			border-color: var(--atss-color-accent, #335EEA);
+		}
+
+		&--checked {
+			background: var(--atss-color-accent, #335EEA);
+			border-color: var(--atss-color-accent, #335EEA);
+		}
+
+		&:disabled {
+			cursor: not-allowed;
+			opacity: 0.6;
+
+			&:hover {
+				border-color: var(--atss-color-border, #C3C4C7);
+			}
+		}
+	}
+
+	&__checkmark {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+	}
+}

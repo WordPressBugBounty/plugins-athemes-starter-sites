@@ -1,0 +1,56 @@
+.atss-onboarding-wizard__loading-screen {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background-color: var(--atss-color-background);
+	z-index: 100000;
+}
+
+.atss-onboarding-wizard__loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 32px;
+}
+
+.atss-onboarding-wizard__step-loading {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+	width: 100%;
+}
+
+.atss-onboarding-wizard__spinner {
+	width: 32px;
+	height: 32px;
+	color: var(--atss-color-accent);
+	animation: atss-spin 1s linear infinite;
+}
+
+.atss-onboarding-wizard__spinner-circle {
+	width: 74px;
+	height: 74px;
+	border-radius: 50%;
+	background-color: #F1F4FF;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0 auto var(--atss-spacing-xxl);
+}
+
+@keyframes atss-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}

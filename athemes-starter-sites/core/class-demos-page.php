@@ -111,7 +111,7 @@ class ATSS_Demos_Page {
 	 * Html Import Data
 	 */
 	public function html_import_data() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		$demo_id = isset( $_POST['demo_id'] ) ? sanitize_text_field( $_POST['demo_id'] ) : false;
 
@@ -173,7 +173,7 @@ class ATSS_Demos_Page {
 
 								<input type="hidden" name="step_name" value="<?php esc_html_e( 'Installing and activating', 'athemes-starter-sites' ); ?> <?php echo esc_attr( $plugin['name'] ); ?>...">
 
-								<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+								<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 								<input type="hidden" name="action" value="atss_import_plugin">
 							</form>
@@ -197,7 +197,7 @@ class ATSS_Demos_Page {
 
 								<input type="hidden" name="step_name" value="<?php esc_html_e( 'Importing contents...', 'athemes-starter-sites' ); ?>">
 
-								<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+								<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 								<input type="hidden" name="action" value="atss_import_contents">
 							</div>
@@ -216,7 +216,7 @@ class ATSS_Demos_Page {
 
 							<input type="hidden" name="step_name" value="<?php esc_html_e( 'Importing widgets...', 'athemes-starter-sites' ); ?>">
 
-							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 							<input type="hidden" name="action" value="atss_import_widgets">
 						</form>
@@ -234,7 +234,7 @@ class ATSS_Demos_Page {
 
 							<input type="hidden" name="step_name" value="<?php esc_html_e( 'Importing customizer options...', 'athemes-starter-sites' ); ?>">
 
-							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 							<input type="hidden" name="action" value="atss_import_customizer">
 						</form>
@@ -250,7 +250,7 @@ class ATSS_Demos_Page {
 
 							<input type="hidden" name="step_name" value="<?php esc_html_e( 'Importing options...', 'athemes-starter-sites' ); ?>">
 
-							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+							<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 							<input type="hidden" name="action" value="atss_import_options">
 						</form>
@@ -265,7 +265,7 @@ class ATSS_Demos_Page {
 
 						<input type="hidden" name="step_name" value="<?php esc_html_e( 'Finishing setup...', 'athemes-starter-sites' ); ?>">
 
-						<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'nonce' ) ); ?>">
+						<input type="hidden" name="nonce" value="<?php echo esc_attr( wp_create_nonce( 'atss_legacy_import' ) ); ?>">
 
 						<input type="hidden" name="action" value="atss_import_finish">
 					</form>

@@ -1,0 +1,55 @@
+// Footer component styles
+
+.atss-onboarding-wizard__footer {
+	// Wrapper for button + error message
+	&-continue-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: var(--atss-spacing-xs);
+		align-items: flex-end;
+	}
+
+	// Error message styling
+	&-error-message {
+		margin: 0;
+		font-size: 12px;
+		line-height: 1.33;
+		color: var(--atss-color-text-error);
+		text-align: right;
+	}
+}
+
+// Button loading state
+.atss-onboarding-wizard__btn--loading {
+	position: relative;
+	pointer-events: none;
+
+	.atss-onboarding-wizard__btn-spinner {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+
+		.atss-onboarding-wizard__loading {
+			padding: 0;
+		}
+
+		.atss-onboarding-wizard__spinner {
+			width: 18px;
+			height: 18px;
+			color: var(--atss-color-background-white);
+		}
+	}
+}
+
+// Skip button loading state - use accent color for spinner
+.atss-onboarding-wizard__btn--skip.atss-onboarding-wizard__btn--loading {
+	.atss-onboarding-wizard__btn-spinner {
+		.atss-onboarding-wizard__spinner {
+			color: var(--atss-color-accent);
+		}
+	}
+}

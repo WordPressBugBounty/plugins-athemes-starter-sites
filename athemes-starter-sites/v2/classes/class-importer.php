@@ -63,6 +63,27 @@ class Athemes_Starter_Sites_Importer {
 	}
 
 	/**
+	 * Verify import nonce - accepts both legacy (atss_legacy_import) and onboarding wizard nonces.
+	 *
+	 * @return void Sends JSON error and dies if nonce is invalid.
+	 */
+	private function verify_import_nonce() {
+		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+
+		// Check legacy nonce first.
+		if ( wp_verify_nonce( $nonce, 'atss_legacy_import' ) ) {
+			return;
+		}
+
+		// Check onboarding wizard nonce.
+		if ( wp_verify_nonce( $nonce, 'atss_onboarding_nonce' ) ) {
+			return;
+		}
+
+		wp_send_json_error( esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ) );
+	}
+
+	/**
 	 * Initialize plugin.
 	 */
 	public function init() {
@@ -239,7 +260,7 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function atss_import_start() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -272,7 +293,7 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function atss_import_clean() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -436,7 +457,7 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_import_plugin() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -494,7 +515,7 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_import_contents() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -652,6 +673,19 @@ class Athemes_Starter_Sites_Importer {
 
 		// Set logger.
 		$importer->set_logger( $logger );
+
+		// Initialize page filter for selective page import (from wizard).
+		$wizard_state = get_option( 'atss_wizard_state', array() );
+		if ( ! empty( $wizard_state['data']['pages']['selectedPages'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-page-filter.php';
+			new ATSS_Onboarding_Page_Filter();
+		}
+
+		// Initialize contact replacer if contact data exists.
+		if ( ! empty( $wizard_state['data']['contact'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+			new ATSS_Onboarding_Contact_Replacer();
+		}
 
 		/**
 		 * Process import.
@@ -1021,7 +1055,7 @@ class Athemes_Starter_Sites_Importer {
 				@set_time_limit( 120 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 			}
 
-			check_ajax_referer( 'nonce', 'nonce' );
+			$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -1094,6 +1128,13 @@ class Athemes_Starter_Sites_Importer {
 			error_log( 'ATSS Widget Import: Failed to decode widget JSON data' );
 			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) ) );
 			return;
+		}
+
+		// Initialize contact replacer if contact data exists.
+		$wizard_state = get_option( 'atss_wizard_state', array() );
+		if ( ! empty( $wizard_state['data']['contact'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+			new ATSS_Onboarding_Contact_Replacer();
 		}
 
 		// Process data with timeout protection
@@ -1176,7 +1217,7 @@ class Athemes_Starter_Sites_Importer {
 	public function ajax_import_customizer() {
 
 		try {
-			check_ajax_referer( 'nonce', 'nonce' );
+			$this->verify_import_nonce();
 
 		/**
 		 * Variables.
@@ -1250,6 +1291,13 @@ class Athemes_Starter_Sites_Importer {
 			wp_send_json_error( esc_html__( 'Failed to parse customizer data. File may be corrupted.', 'athemes-starter-sites' ) );
 		}
 
+		// Initialize contact replacer if contact data exists.
+		$wizard_state = get_option( 'atss_wizard_state', array() );
+		if ( ! empty( $wizard_state['data']['contact'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+			new ATSS_Onboarding_Contact_Replacer();
+		}
+
 		$customizer = new ATSS_Customizer_Importer();
 
 		// Import.
@@ -1292,7 +1340,7 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_import_finish() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		$this->verify_import_nonce();
 
 		/**
 		 * Get Demo ID.
@@ -1367,10 +1415,16 @@ class Athemes_Starter_Sites_Importer {
 			update_option( 'woocommerce_queue_flush_rewrite_rules', 'yes' );
 		}
 
-	/**
-	 * Action hook.
-	 */
-	do_action( 'atss_finish_import', $demo_id, $custom_import_settings ?? array() );
+		/**
+		 * Action hook.
+		 */
+		do_action( 'atss_finish_import', $demo_id, $custom_import_settings ?? array() );
+
+		/**
+		 * Reset wizard state after successful import.
+		 * Delete the wizard state so users start fresh if they return to the wizard.
+		 */
+		delete_option( 'atss_wizard_state' );
 
 		/**
 		 * Return successful AJAX.

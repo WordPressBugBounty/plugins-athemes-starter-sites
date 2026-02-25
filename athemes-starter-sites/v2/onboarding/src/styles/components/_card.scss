@@ -1,0 +1,121 @@
+/**
+ * Starter Site Card Component Styles
+ *
+ * @package Athemes Starter Sites
+ */
+
+.atss-starter-card {
+	background-color: var(--atss-color-background-white);
+	border: 1px solid var(--atss-color-border-divider);
+	border-radius: var(--atss-radius-lg);
+	overflow: hidden;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	max-width: 296px;
+
+	&:hover {
+		box-shadow: 0 12px 24px 0 rgba(0, 0, 0, 0.08);
+		transform: translateY(-2px);
+	}
+
+	&:focus {
+		outline: 2px solid var(--atss-color-border-focus);
+		outline-offset: 2px;
+	}
+
+	// Selected state
+	&--selected {
+		border-color: var(--atss-color-accent);
+		border-width: 2px;
+		box-shadow: 0 0 0 3px var(--atss-color-accent-light);
+	}
+}
+
+// Preview area wrapper
+.atss-starter-card__preview {
+	position: relative;
+	width: 100%;
+	height: 300px;
+	overflow: hidden;
+	background-color: var(--atss-color-background-surface);
+}
+
+// Thumbnail image
+.atss-starter-card__thumbnail {
+	width: 100%;
+	display: block;
+	transform: translateY(0);
+	transition: transform var(--scroll-up-duration, 1.5s) ease-out;
+
+	&--hidden {
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	&--scrolling {
+		transform: translateY(var(--scroll-distance, 0));
+		transition: transform var(--scroll-down-duration, 4s) ease-in-out;
+	}
+}
+
+// Iframe preview - Responsive at 1440px width
+.atss-starter-card__iframe {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 1440px; /* Fixed width for consistent rendering */
+	height: 8000px; /* Large height to capture full page content */
+	border: none;
+	pointer-events: none;
+	transform: scale(0.2056); /* Scale: 296px / 1440px */
+	transform-origin: top left;
+}
+
+// Info section (bottom part)
+.atss-starter-card__info {
+	padding: var(--atss-spacing-md);
+	border-top: 1px solid var(--atss-color-border-divider);
+	background-color: var(--atss-color-background-white);
+	min-height: 55px;
+}
+
+// Site name
+.atss-starter-card__name {
+	color: var(--atss-color-text-heading);
+	margin-right: var(--atss-spacing-sm);
+	text-align: left;
+}
+
+// Badge
+.atss-starter-card__badge {
+	padding: 8px 10px;
+	border-radius: 3px;
+	font-size: 10px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	flex-shrink: 0;
+	line-height: 1;
+
+	&--free {
+		background-color: rgb(227, 252, 231);
+		color: rgb(0, 138, 32);
+	}
+
+	&--pro {
+		background-color: var(--atss-color-accent);
+		color: var(--atss-color-background-white);
+	}
+}
+
+// Grid layout for cards (to be used in Design step)
+.atss-design-demos-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(296px, 1fr));
+	gap: var(--atss-spacing-xl);
+	width: 100%;
+}
+

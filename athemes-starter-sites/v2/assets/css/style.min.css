@@ -107,6 +107,7 @@
 .atss-import-finish-tweet p{margin:0}
 .atss-import-finish-tweet a{display:-webkit-box;display:-ms-flexbox;display:flex;grid-gap:5px;-webkit-box-pack:end;-ms-flex-pack:end;justify-content:flex-end;-webkit-box-align:center;-ms-flex-align:center;align-items:center;text-decoration:none;color:#6e74f8;font-size:13px;line-height:1em;font-weight:500}
 .atss-import-finish-tweet a:focus,.atss-import-finish-tweet a:active{-webkit-box-shadow:none;box-shadow:none}
+.atss-wizard-redirect-loading .atss-import,.atss-wizard-redirect-loading .atss-demo-item{pointer-events:none}
 html[dir=rtl] .atss-import-checkboxes i{margin-left:0;margin-right:2px}
 html[dir=rtl] .atss-import-checkboxes input:checked+span i{margin-left:0;margin-right:16px}
 @media screen and (max-width:1600px){.atss-demo-data{-webkit-box-orient:vertical;-webkit-box-direction:normal;-ms-flex-direction:column;flex-direction:column;-webkit-box-align:start;-ms-flex-align:start;align-items:flex-start}

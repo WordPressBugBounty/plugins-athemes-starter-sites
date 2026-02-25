@@ -208,7 +208,7 @@ class Athemes_Starter_Sites_Import {
 	 * AJAX callback to install and activate a plugin.
 	 */
 	public function ajax_import_plugin() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		// Demo ID
 		set_transient( 'atss_importer_demo_id', $_POST['demo_id'] );
@@ -260,7 +260,7 @@ class Athemes_Starter_Sites_Import {
 	 * AJAX callback to import contents and media files from contents.xml.
 	 */
 	public function ajax_import_contents() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		// Demo ID
 		set_transient( 'atss_importer_demo_id', $_POST['demo_id'] );
@@ -461,7 +461,7 @@ class Athemes_Starter_Sites_Import {
 	 * AJAX callback to import customizer settings from customizer.json.
 	 */
 	public function ajax_import_customizer() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		// Demo ID
 		set_transient( 'atss_importer_demo_id', $_POST['demo_id'] );
@@ -528,7 +528,7 @@ class Athemes_Starter_Sites_Import {
 	 * AJAX callback to import widgets on all sidebars from widgets.json.
 	 */
 	public function ajax_import_widgets() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		// Demo ID
 		set_transient( 'atss_importer_demo_id', $_POST['demo_id'] );
@@ -607,7 +607,7 @@ class Athemes_Starter_Sites_Import {
 	 * AJAX callback to import other options from options.json.
 	 */
 	public function ajax_import_options() {
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
 		if ( ! isset( $_POST['url'] ) || ! $_POST['url'] ) {
 			wp_send_json_error( esc_html__( 'The url address of the demo content is not specified.', 'athemes-starter-sites' ) );

@@ -1,0 +1,18 @@
+// Main stylesheet entry point for the onboarding wizard
+
+// Import base styles
+@use '_base';
+
+// Import component styles
+@use 'components/navigation';
+@use 'components/steps';
+@use 'components/buttons';
+@use 'components/footer';
+@use 'components/search-control';
+@use 'components/filter-control';
+@use 'components/card';
+@use 'components/page-card';
+@use 'components/feature-card';
+@use 'components/controls';
+@use 'components/plugin-summary';
+@use 'utilities/spinner';

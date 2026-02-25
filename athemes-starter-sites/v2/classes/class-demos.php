@@ -115,30 +115,29 @@ class ATSS_Demos_Page {
 	 */
 	public function import_data() {
 
-		check_ajax_referer( 'nonce', 'nonce' );
+		check_ajax_referer( 'atss_legacy_import', 'nonce' );
 
-    try{
+		try{
 
-			$demo_id        = ( isset( $_POST['demo_id'] ) ) ? sanitize_text_field( wp_unslash( $_POST['demo_id'] ) ) : '';
-			$builder        = ( isset( $_POST['builder'] ) ) ? sanitize_text_field( wp_unslash( $_POST['builder'] ) ) : '';
-			$content_type   = ( isset( $_POST['content_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['content_type'] ) ) : '';
-			$import_content = ( isset( $_POST['import_content'] ) ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_content'] ) ) : '';
+				$demo_id        = ( isset( $_POST['demo_id'] ) ) ? sanitize_text_field( wp_unslash( $_POST['demo_id'] ) ) : '';
+				$builder        = ( isset( $_POST['builder'] ) ) ? sanitize_text_field( wp_unslash( $_POST['builder'] ) ) : '';
+				$content_type   = ( isset( $_POST['content_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['content_type'] ) ) : '';
+				$import_content = ( isset( $_POST['import_content'] ) ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['import_content'] ) ) : '';
 
-			if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-        throw new Exception( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
-      }
+				if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
+			throw new Exception( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+		}
 
-			// Reset import data.
-			// delete_transient( 'atss_importer_data' );
+				// Reset import data.
+				// delete_transient( 'atss_importer_data' );
 
-			wp_send_json_success( $this->demos[ $demo_id ] );
+				wp_send_json_success( $this->demos[ $demo_id ] );
 
-    } catch( Exception $e ) {
+		} catch( Exception $e ) {
 
-			wp_send_json_error( $e->getMessage() );
+				wp_send_json_error( $e->getMessage() );
 
-    }
-
+		}
 	}
 
 	/**
@@ -619,7 +618,7 @@ class ATSS_Demos_Page {
    */
   public function ajax_dismissed_handler() {
 
-    check_ajax_referer( 'nonce', 'nonce' );
+    check_ajax_referer( 'atss_legacy_import', 'nonce' );
     set_transient( 'atss_no_active_theme', true, 90 * DAY_IN_SECONDS );
     wp_send_json_success();
 

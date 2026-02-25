@@ -1,0 +1,187 @@
+:root {
+	--atss-font-family: "Inter", sans-serif;
+
+	--atss-color-accent: #335EEA;
+	--atss-color-accent-hover: #294CBD;
+	--atss-color-accent-light: #F1F4FF;
+	
+	--atss-color-link: var(--atss-color-accent);
+	--atss-color-link-hover: var(--atss-color-accent-hover);
+	
+	--atss-color-text-error: #D63638;
+	
+	--atss-color-background: #F6F6F6;
+	--atss-color-background-surface: #F0F0F1;
+	--atss-color-background-white: #FFFFFF;
+	--atss-color-white: var(--atss-color-background-white);
+	--atss-color-background-surface-light: #f7f7f7;
+	
+	--atss-color-text-title: #101517;
+	--atss-color-text-heading: #1D2327;
+	
+	--atss-color-text-primary: #2C3338;
+	--atss-color-text-secondary: #50575E;
+	--atss-color-text-tertiary: #787C82;
+	--atss-color-text-icon: #A7AAAD;
+	
+	--atss-color-border: #C3C4C7;
+	--atss-color-border-focus: var(--atss-color-accent);
+	--atss-color-border-primary: var(--atss-color-accent);
+	--atss-color-border-divider: #DCDCDE;
+	
+	--atss-badge-green-background: #E3FCE7;
+	--atss-badge-green-text: #008A20;
+	--atss-badge-red-background: #FEE2E2;
+	--atss-badge-red-text: #DC2626;
+	
+	--atss-header-height: 80px;
+	--atss-font-size-base: 16px;
+	--atss-font-size-sm: 14px;
+	--atss-font-size-xs: 12px;
+	
+	--atss-radius-md: 4px;
+	--atss-radius-lg: 8px;
+	--atss-radius-xl: 14px;
+	
+	--atss-spacing-xs: 8px;
+	--atss-spacing-sm: 12px;
+	--atss-spacing-md: 16px;
+	--atss-spacing-xl: 24px;
+	--atss-spacing-xxl: 32px;
+	
+	--atss-padding-lg: 24px 32px;
+	
+	--atss-shadow-xs: 0 1px 2px 0 #0000001A;
+	--atss-shadow-sm: 0 4px 5px 0 #0000000D;
+	--atss-shadow-md: 0 12px 24px 0 #00000014;
+	--atss-shadow-footer: 0 -4px 8px 0 #0000000A;
+}
+
+#atss-onboarding-wizard-root {
+	min-height: 100vh;
+	font-family: var(--atss-font-family);
+	font-size: var(--atss-font-size-base);
+	background-color: var(--atss-color-background);
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 99999;
+	overflow-y: auto;
+	color: var(--atss-color-text-primary);
+	--wp-admin-theme-color: var(--atss-color-accent);
+	--wp-admin-theme-color-darker-10: var(--atss-color-accent-hover);
+}
+
+#atss-onboarding-wizard-root * {
+	box-sizing: border-box;
+}
+
+/* utility classes */
+.text-primary {
+	color: var(--atss-color-text-primary);
+}
+.text-secondary {
+	color: var(--atss-color-text-secondary);
+}
+.text-tertiary {
+	color: var(--atss-color-text-tertiary);
+}
+.text-icon {
+	color: var(--atss-color-text-icon);
+}
+
+.text-title {
+	color: var(--atss-color-text-title);
+}
+.text-heading {
+	color: var(--atss-color-text-heading);
+}
+
+.flex {
+	display: flex !important;
+}
+
+.flex-col {
+	flex-direction: column !important;
+}
+
+.justify-center {
+	justify-content: center !important;
+}
+
+.justify-between {
+	justify-content: space-between !important;
+}
+
+.items-center {
+	align-items: center !important;
+}
+
+.gap-xs {
+	gap: var(--atss-spacing-xs) !important;
+}
+
+.gap-sm {
+	gap: var(--atss-spacing-sm) !important;
+}
+
+.gap-md {
+	gap: var(--atss-spacing-md) !important;
+}
+
+.gap-xxl {
+	gap: var(--atss-spacing-xxl) !important;
+}
+
+.text-xs {
+	font-size: 12px;
+}
+
+.text-sm {
+	font-size: 14px;
+}
+
+.text-md {
+	font-size: var(--atss-font-size-base);
+}
+
+.text-lg {
+	font-size: 18px;
+}
+
+.text-xl {
+	font-size: 24px;
+}
+
+.font-medium {
+	font-weight: 500;
+}
+
+.font-semibold {
+	font-weight: 600;
+}
+
+.w100 {
+	width: 100% !important;
+	max-width: 100% !important;
+}
+
+.text-align-center {
+	text-align: center !important;
+}
+
+.text-align-left {
+	text-align: left !important;
+}
+
+.screen-reader-text {
+	position: absolute;
+	clip: rect(1px, 1px, 1px, 1px);
+	clip-path: inset(50%);
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	word-wrap: normal !important;
+}

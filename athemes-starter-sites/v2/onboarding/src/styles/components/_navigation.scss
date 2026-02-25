@@ -1,0 +1,80 @@
+.atss-onboarding-wizard__nav {
+	background-color: var(--atss-color-background-white);
+	padding: var(--atss-padding-lg);
+	border-bottom: 1px solid var(--atss-color-border-divider);
+	height: 80px;
+	box-sizing: border-box;
+
+	button {
+		border: none;
+		background: none;
+		padding: 0;
+		margin: 0;
+	}
+}
+
+.atss-onboarding-wizard__logo {
+
+	.atss-onboarding-wizard__logo-image {
+		height: 36px;
+		width: auto;
+	}
+}
+
+.atss-onboarding-wizard__nav {
+	.atss-onboarding-wizard__step {
+		position: relative;
+	
+		&:not(:last-child)::after {
+			content: '';
+			display: inline-block;
+			position: relative;
+			width: 20px;
+			height: 1px;
+			background-color: var(--atss-color-border-divider);
+			pointer-events: none;
+		}
+	}
+}
+
+.atss-onboarding-wizard__step-number {
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	background-color: var(--atss-color-background-surface);
+	border-radius: 20px;
+	color: var(--atss-color-text-icon);
+	font-size: 12px;
+	font-weight: 600;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-sizing: border-box;
+}
+
+.atss-onboarding-wizard__step.is-active .atss-onboarding-wizard__step-number {
+	padding: 0;
+	background-color: var(--atss-color-accent-light);
+	border: 1px solid var(--atss-color-accent);
+	color: var(--atss-color-accent);
+}
+
+.atss-onboarding-wizard__step.is-completed .atss-onboarding-wizard__step-number {
+	padding: 0;
+	background-color: var(--atss-color-accent);
+	color: var(--atss-color-background-white);
+}
+
+.atss-onboarding-wizard__close {
+	cursor: pointer;
+	font-size: 32px;
+	transition: color 0.2s ease-in-out;
+
+	&:hover {
+		color: var(--atss-color-text-secondary);
+	}
+
+	@media (min-width: 1200px) {
+		margin-left: 130px !important;
+	}
+}

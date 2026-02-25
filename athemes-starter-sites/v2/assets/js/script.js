@@ -120,6 +120,58 @@ _dcs.account = 5598225;
     }
     atssDoneOrFail = true;
   };
+
+  /**
+   * Check if onboarding wizard should intercept legacy import.
+   * If yes, save state and redirect to wizard.
+   *
+   * @param {string} demoId - Demo ID (e.g., 'main-pro')
+   * @param {string} builder - Builder type ('elementor' or 'gutenberg')
+   * @return {boolean} - true if redirecting to wizard, false otherwise
+   */
+  var atssCheckAndRedirectToWizard = function atssCheckAndRedirectToWizard(demoId, builder) {
+    // Check if onboarding wizard is active
+    if (!window.atss_localize.onboardingWizardActive) {
+      return false; // Continue with legacy flow
+    }
+
+    // Validate inputs
+    if (!demoId || !builder) {
+      console.error('ATSS: Cannot redirect to wizard - missing demo ID or builder');
+      return false;
+    }
+
+    // Show loading indicator
+    $body.addClass('atss-wizard-redirect-loading');
+
+    // Initialize wizard state via AJAX
+    $.ajax({
+      url: window.atss_localize.ajax_url,
+      type: 'POST',
+      data: {
+        action: 'atss_init_wizard_from_legacy',
+        nonce: window.atss_localize.nonce,
+        demo_id: demoId,
+        builder: builder
+      },
+      success: function success(response) {
+        if (response.success && response.data.redirectUrl) {
+          // Redirect to onboarding wizard
+          window.location.href = response.data.redirectUrl;
+        } else {
+          // Failed to initialize state, continue with legacy
+          console.error('ATSS: Failed to initialize wizard state', response);
+          $body.removeClass('atss-wizard-redirect-loading');
+        }
+      },
+      error: function error(xhr, status, _error2) {
+        // AJAX error, continue with legacy
+        console.error('ATSS: Wizard redirect AJAX error', _error2);
+        $body.removeClass('atss-wizard-redirect-loading');
+      }
+    });
+    return true; // Signal that we're handling the redirect
+  };
   $(document).ready(function () {
     // Dismissable
     var $notice = $('.atss-notice');
@@ -196,17 +248,30 @@ _dcs.account = 5598225;
       });
       $atss.on('click', '.atss-import-open-button', function (e) {
         e.preventDefault();
-        var demoId = $(this).data('demo-id');
+        var $button = $(this);
+        var demoId = $button.data('demo-id');
+        var builder = $button.data('builder');
+        var isQuick = $button.data('quick');
+
+        // Quick import: builder is pre-selected, check for wizard redirect
+        if (isQuick && builder) {
+          var shouldRedirect = atssCheckAndRedirectToWizard(demoId, builder);
+          if (shouldRedirect) {
+            return; // Stop execution, redirect in progress
+          }
+        }
+
+        // Continue with legacy import modal (existing code)
         var demoObj = window.atss_localize.demos[demoId];
         var template = wp.template('atss-import');
         if (demoObj && demoObj.builders.length) {
-          atssDemoItem = $(this).closest('.atss-demo-item');
+          atssDemoItem = $button.closest('.atss-demo-item');
 
           // create args object
           demoObj.args = {};
           demoObj.args.demoId = demoId;
-          demoObj.args.quick = $(this).data('quick') || demoObj.builders.length < 2 || false;
-          demoObj.args.builder = $(this).data('builder') || demoObj.builders[0];
+          demoObj.args.quick = isQuick || demoObj.builders.length < 2 || false;
+          demoObj.args.builder = builder || demoObj.builders[0];
           demoObj.args.imported = window.atss_localize.imported || atssDoneOrFail;
           $atss.find('.atss-import').html(template(demoObj));
           $body.addClass('atss-import-show');
@@ -228,7 +293,25 @@ _dcs.account = 5598225;
       });
       $atss.on('click', '.atss-import-next-button', function (e) {
         e.preventDefault();
-        var $step = $(this).closest('.atss-import-step');
+        var $button = $(this);
+        var $step = $button.closest('.atss-import-step');
+        var $form = $atss.find('.atss-import-form');
+
+        // Check if we're on the builder selection step (contains .atss-import-builder-select)
+        var isBuilderStep = $step.find('.atss-import-builder-select').length > 0;
+        if (isBuilderStep) {
+          // Extract demo ID and selected builder
+          var demoId = $form.find('input[name="demo_id"]').val();
+          var builder = $form.find('input[name="builder_type"]:checked').val();
+          if (demoId && builder) {
+            var shouldRedirect = atssCheckAndRedirectToWizard(demoId, builder);
+            if (shouldRedirect) {
+              return; // Stop execution, redirect in progress
+            }
+          }
+        }
+
+        // Continue with legacy flow (existing code)
         $step.removeClass('atss-active');
         $step.next().addClass('atss-active');
       });
