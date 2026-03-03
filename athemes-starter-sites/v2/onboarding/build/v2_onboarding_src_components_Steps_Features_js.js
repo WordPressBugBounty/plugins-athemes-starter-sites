@@ -577,4 +577,4 @@ const DEFAULT_DESCRIPTION = (0,_wordpress_i18n__WEBPACK_IMPORTED_MODULE_0__.__)(
 /***/ })
 
 }]);
-//# sourceMappingURL=v2_onboarding_src_components_Steps_Features_js.js.map?ver=b7593e6cb2685ba22609
+//# sourceMappingURL=v2_onboarding_src_components_Steps_Features_js.js.map?ver=02dcf48c580116f78ec0

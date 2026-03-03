@@ -1084,7 +1084,8 @@ function Customize({
 
   // Check if the selected site is a Pro template
   // The 'type' property is set to 'pro' or 'free' in the starter sites data
-  const isProTemplate = selectedSite?.type === 'pro';
+  const isProUser = window.atssOnboarding?.isProUser || false;
+  const isProTemplate = selectedSite?.type === 'pro' && !isProUser;
 
   // Initialize preview bridge
   (0,_utils_use_preview_sync__WEBPACK_IMPORTED_MODULE_15__.usePreviewBridgeInit)(iframeRef);
@@ -2976,4 +2977,4 @@ const usePreviewBridgeInit = iframeRef => {
 /***/ })
 
 }]);
-//# sourceMappingURL=v2_onboarding_src_components_Steps_Customize_js.js.map?ver=6a5e6445472c32f83cad
+//# sourceMappingURL=v2_onboarding_src_components_Steps_Customize_js.js.map?ver=f8cdd62c933f77dd3125

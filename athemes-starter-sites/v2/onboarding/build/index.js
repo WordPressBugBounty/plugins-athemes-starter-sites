@@ -3508,7 +3508,7 @@ const getThemeLogo = () => {
  * @return {string} Preview image URL.
  */
 const getPreviewImageUrl = (id, themeName = 'sydney') => {
-  const normalizedThemeName = (themeName || 'sydney').toLowerCase();
+  const normalizedThemeName = (themeName || 'sydney').toLowerCase().includes('sydney') ? 'sydney' : 'botiga';
   return `https://athemes.com/themes-demo-content/full-height-ss/${normalizedThemeName}/${id}.jpg`;
 };
 
@@ -3663,7 +3663,7 @@ module.exports = window["ReactJSXRuntime"];
 /******/ 		// This function allow to reference async chunks
 /******/ 		__webpack_require__.u = (chunkId) => {
 /******/ 			// return url for filenames based on template
-/******/ 			return "" + chunkId + ".js?ver=" + {"v2_onboarding_src_components_Steps_Design_js":"2ef358ff1506053b63f2","v2_onboarding_src_components_Steps_Customize_js":"6a5e6445472c32f83cad","v2_onboarding_src_components_Steps_Pages_js":"96ebfb957069e3dd18b8","vendors-node_modules_react-international-phone_dist_index_css-node_modules_react-internationa-e45498":"55d8c500cab8a80236fd","v2_onboarding_src_components_Steps_Contact_js-node_modules_react-international-phone_dist_index_css":"72ba19437bc86025820d","v2_onboarding_src_components_Steps_Features_js":"b7593e6cb2685ba22609","v2_onboarding_src_components_Steps_Optin_js":"0c45f94b423ecf0e54fa","v2_onboarding_src_components_Steps_Import_js":"6d2945263021e568fdfd"}[chunkId] + "";
+/******/ 			return "" + chunkId + ".js?ver=" + {"v2_onboarding_src_components_Steps_Design_js":"ce2e13c4c406b21ff580","v2_onboarding_src_components_Steps_Customize_js":"f8cdd62c933f77dd3125","v2_onboarding_src_components_Steps_Pages_js":"85ce1e62ac3d12914a7e","vendors-node_modules_react-international-phone_dist_index_css-node_modules_react-internationa-e45498":"55d8c500cab8a80236fd","v2_onboarding_src_components_Steps_Contact_js-node_modules_react-international-phone_dist_index_css":"e637026c9cfd87db3688","v2_onboarding_src_components_Steps_Features_js":"02dcf48c580116f78ec0","v2_onboarding_src_components_Steps_Optin_js":"860fd8469bbe4ecedb31","v2_onboarding_src_components_Steps_Import_js":"5464bb5682360e2acc9f"}[chunkId] + "";
 /******/ 		};
 /******/ 	})();
 /******/ 	

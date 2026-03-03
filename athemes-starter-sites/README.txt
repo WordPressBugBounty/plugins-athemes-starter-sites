@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 6.8.3
 Requires PHP: 5.4
-Stable tag: 1.1.6
+Stable tag: 1.1.7
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html

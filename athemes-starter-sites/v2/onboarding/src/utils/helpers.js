@@ -38,7 +38,7 @@ export const getThemeLogo = () => {
  * @return {string} Preview image URL.
  */
 export const getPreviewImageUrl = ( id, themeName = 'sydney' ) => {
-	const normalizedThemeName = ( themeName || 'sydney' ).toLowerCase();
+	const normalizedThemeName = ( themeName || 'sydney' ).toLowerCase().includes( 'sydney' ) ? 'sydney' : 'botiga';
 	return `https://athemes.com/themes-demo-content/full-height-ss/${ normalizedThemeName }/${ id }.jpg`;
 };
 

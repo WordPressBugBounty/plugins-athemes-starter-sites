@@ -71,7 +71,8 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 
 	// Check if the selected site is a Pro template
 	// The 'type' property is set to 'pro' or 'free' in the starter sites data
-	const isProTemplate = selectedSite?.type === 'pro';
+	const isProUser = window.atssOnboarding?.isProUser || false;
+	const isProTemplate = selectedSite?.type === 'pro' && ! isProUser;
 
 	// Initialize preview bridge
 	usePreviewBridgeInit( iframeRef );

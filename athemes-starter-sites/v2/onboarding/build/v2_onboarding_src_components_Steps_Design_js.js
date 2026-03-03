@@ -794,4 +794,4 @@ const getThemeName = () => {
 /***/ })
 
 }]);
-//# sourceMappingURL=v2_onboarding_src_components_Steps_Design_js.js.map?ver=2ef358ff1506053b63f2
+//# sourceMappingURL=v2_onboarding_src_components_Steps_Design_js.js.map?ver=ce2e13c4c406b21ff580
