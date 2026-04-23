@@ -4,7 +4,7 @@
  * @package Athemes Starter Sites
  */
 
-import { __ } from '@wordpress/i18n';
+import { sprintf, __ } from '@wordpress/i18n';
 import pluginInfo, { DEFAULT_ICON, DEFAULT_DESCRIPTION } from '../../data/plugin-info';
 
 const PLUGIN_INFO = pluginInfo;
@@ -13,8 +13,8 @@ function getPluginIcon( slug ) {
 	return PLUGIN_INFO[ slug ]?.icon || DEFAULT_ICON;
 }
 
-function getPluginName( slug ) {
-	return PLUGIN_INFO[ slug ]?.name || slug;
+function getPluginName( plugin ) {
+	return PLUGIN_INFO[ plugin.slug ]?.name || plugin.name || plugin.slug;
 }
 
 function getDescription( slug ) {
@@ -78,7 +78,7 @@ function FeatureCard( { plugin, isSelected = false, onToggle } ) {
 
 	return (
 		<div
-			className={ `atss-feature-card ${ isSelected ? 'atss-feature-card--selected' : '' } ${ isDisabled ? 'atss-feature-card--disabled' : '' }` }
+			className={ `atss-feature-card atss-feature-card--${ plugin.slug } ${ isSelected ? 'atss-feature-card--selected' : '' } ${ isDisabled ? 'atss-feature-card--disabled' : '' }` }
 			onClick={ ! isDisabled ? handleToggle : undefined }
 			role="button"
 			tabIndex={ isDisabled ? -1 : 0 }
@@ -94,44 +94,48 @@ function FeatureCard( { plugin, isSelected = false, onToggle } ) {
 				<div className="atss-feature-card__text">
 					<div className="atss-feature-card__title-wrapper">
 						<h3 className="atss-feature-card__title">
-							{ getPluginName( plugin.slug ) }
+							{ getPluginName( plugin ) }
 						</h3>
 						{ renderBadge() }
 					</div>
 
-					<p className="atss-feature-card__description">
-						{ getDescription( plugin.slug ) }
-					</p>
+					<p className="atss-feature-card__description" dangerouslySetInnerHTML={ { __html: getDescription( plugin.slug ) } } />
 				</div>
 			</div>
 
-			<button
-				type="button"
-				className={ `atss-feature-card__checkbox ${ isSelected ? 'atss-feature-card__checkbox--checked' : '' }` }
-				onClick={ handleToggle }
-				disabled={ isDisabled }
-				aria-checked={ isSelected }
-				aria-label={ isSelected ? __( 'Deselect plugin', 'athemes-starter-sites' ) : __( 'Select plugin', 'athemes-starter-sites' ) }
+			<span
+				className="atss-feature-card__checkbox-wrapper"
+				aria-label={ sprintf( __( 'Install %s', 'athemes-starter-sites' ), plugin?.pillName || plugin.name ) }
 			>
-				{ isSelected && (
-					<svg
-						width="12"
-						height="10"
-						viewBox="0 0 12 10"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						className="atss-feature-card__checkmark"
-					>
-						<path
-							d="M1 5L4.5 8.5L11 1"
-							stroke="white"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeLinejoin="round"
-						/>
-					</svg>
-				) }
-			</button>
+				<button
+					type="button"
+					className={ `atss-feature-card__checkbox ${ isSelected ? 'atss-feature-card__checkbox--checked' : '' }` }
+					onClick={ handleToggle }
+					disabled={ isDisabled }
+					aria-checked={ isSelected }
+				>
+					{ isSelected && (
+						<svg
+							width="12"
+							height="10"
+							viewBox="0 0 12 10"
+							fill="none"
+							xmlns="http://www.w3.org/2000/svg"
+							className="atss-feature-card__checkmark"
+						>
+							<path
+								d="M1 5L4.5 8.5L11 1"
+								stroke="white"
+								strokeWidth="2"
+								strokeLinecap="round"
+								strokeLinejoin="round"
+							/>
+						</svg>
+					) }
+				</button>
+			</span>
+
+			{ plugin.image && <img src={ plugin.image } width="369" height="214" /> }
 		</div>
 	);
 }

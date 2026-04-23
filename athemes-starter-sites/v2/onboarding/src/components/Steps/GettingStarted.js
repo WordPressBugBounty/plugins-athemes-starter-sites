@@ -12,6 +12,8 @@ import CustomSelectControlWithPlaceholder from '../Controls/CustomSelectControlW
 import { Footer } from '../Layout';
 import starterCategories from '../../data/starter-categories';
 import { useWizard } from '../../context/WizardContext';
+import isBotiga from '../../utils/is-botiga';
+import isElementor from '../../utils/is-elementor';
 
 /**
  * Getting Started step component.
@@ -27,14 +29,21 @@ function GettingStarted( { onContinue, navigationLoading, navigationError } ) {
 	const savedData = wizardData[ 'getting-started' ] || {};
 
 	const [ dropdownValue, setDropdownValue ] = useState( savedData.siteCategory || null );
-	const [ selectedBuilder, setSelectedBuilder ] = useState( builder || 'gutenberg' );
+	const [ selectedBuilder, setSelectedBuilder ] = useState(
+		builder || savedData.builder || ( isElementor ? 'elementor' : 'gutenberg' )
+	);
 
 	const wordpressIcon = require( '../../assets/images/wordpress.svg' ).default;
 	const elementorIcon = require( '../../assets/images/elementor.svg' ).default;
 
-	// Check if current theme is Botiga.
-	const themeName = typeof atssOnboarding !== 'undefined' ? atssOnboarding?.themeName : '';
-	const isBotiga = themeName?.toLowerCase().includes( 'botiga' );
+	const themeText = {
+		wizardTitle: isBotiga
+			? __( 'Let’s Set Up Your Shop!', 'athemes-starter-sites' )
+			: __( 'Let\’s Build Your Website!', 'athemes-starter-sites' ),
+		wizardDescription: isBotiga
+			? __( 'Tell us a bit about your shop so we can recommend the perfect templates and tools to get you started.', 'athemes-starter-sites' )
+			: __( 'Tell us a bit about your site so we can recommend the perfect templates and tools to get you started.', 'athemes-starter-sites' ),
+	};
 
 	/**
 	 * Handle continue button click.
@@ -62,9 +71,9 @@ function GettingStarted( { onContinue, navigationLoading, navigationError } ) {
 							className="atss-onboarding-wizard__emoji"
 						/>
 					</div>
-					<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">{ __( 'Let’s build your website!', 'athemes-starter-sites' ) }</h2>
-					<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary">{ __( 'Tell us a bit about your site so we can recommend the perfect templates and tools to get you started', 'athemes-starter-sites' ) }</p>
-				
+					<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">{ themeText.wizardTitle }</h2>
+					<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary">{ themeText.wizardDescription }</p>
+
 					<div className="atss-onboarding-wizard__step-body-form atss-options-form flex flex-col gap-xxl">
 						<div className="atss-form-row flex gap-xxl">
 							<div className="atss-form-field">
@@ -90,7 +99,7 @@ function GettingStarted( { onContinue, navigationLoading, navigationError } ) {
 								</div>
 							) }
 						</div>
-						
+
 						<div className="atss-form-field">
 						<RadioCardControl
 							label={ __( 'Preferred builder', 'athemes-starter-sites' ) }

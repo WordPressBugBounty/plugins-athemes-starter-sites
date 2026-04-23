@@ -274,7 +274,7 @@
 	width: calc(25% - var(--atss-spacing-xs));;
 	height: 36px;
 	flex-shrink: 0;
-	
+
 	&:hover {
 		border-color: var(--atss-color-accent);
 		box-shadow: var(--atss-shadow-xs);
@@ -283,7 +283,7 @@
 	&--selected {
 		border-color: var(--atss-color-accent);
 		outline: 2px solid var(--atss-color-accent);
-		
+
 		&:hover {
 			border-color: var(--atss-color-accent);
 		}
@@ -294,10 +294,10 @@
 	display: flex;
 	align-items: center;
 	gap: 0;
-	
+
 	> * {
 		margin-left: -8px;
-		
+
 		&:first-child {
 			margin-left: 0;
 		}
@@ -312,10 +312,10 @@
 	flex-shrink: 0;
 	transition: transform 0.15s ease;
 	position: relative;
-	
+
 	// Add subtle shadow for depth
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-	
+
 	&--dashed {
 		background-color: #fff;
 		border: 1px dashed rgba(0, 0, 0, 0.3);
@@ -394,17 +394,17 @@
 	font-family: inherit;
 	color: var(--atss-color-text);
 	transition: border-color 0.2s ease;
-	
+
 	&:hover {
 		border-color: var(--atss-color-accent);
 	}
-	
+
 	&:focus {
 		outline: none;
 		border-color: var(--atss-color-accent);
 		box-shadow: 0 0 0 1px var(--atss-color-accent);
 	}
-	
+
 	&::placeholder {
 		color: rgb(120, 124, 130);
 	}
@@ -412,7 +412,7 @@
 
 .atss-colors-control__picker-popover {
 	padding: 0;
-	
+
 	.components-color-picker {
 		.components-input-control {
 			display: none;
@@ -455,7 +455,7 @@
 	flex-shrink: 0;
 	cursor: default;
 	position: relative;
-	
+
 	&:hover {
 		&::after {
 			content: attr(title);
@@ -511,7 +511,7 @@
 	width: calc(25% - var(--atss-spacing-xs));
 	height: 36px;
 	flex-shrink: 0;
-	
+
 	&:hover {
 		border-color: var(--atss-color-accent);
 		box-shadow: var(--atss-shadow-xs);
@@ -520,7 +520,7 @@
 	&--selected {
 		border-color: var(--atss-color-accent);
 		outline: 2px solid var(--atss-color-accent);
-		
+
 		&:hover {
 			border-color: var(--atss-color-accent);
 		}
@@ -533,7 +533,7 @@
 	justify-content: center;
 	line-height: 1;
 	color: #3d3d3d;
-	
+
 	span {
 		display: inline;
 		line-height: 1;
@@ -555,7 +555,7 @@
 		color: var(--atss-color-text-icon) !important;
 		font-size: 14px !important;
 	}
-	
+
 	input{
 		border: 1px solid var(--atss-color-border) !important;
 		box-shadow: none !important;
@@ -648,6 +648,7 @@
 		font-weight: 400;
 		text-transform: none;
 		color: var(--atss-color-text-primary);
+		line-height: 1.4;
 	}
 }
 
@@ -687,6 +688,10 @@
 		border-radius: 50%;
 		border: 2px solid var(--atss-color-border);
 		background-color: transparent;
+
+		.atss-onboarding-wizard--theme-botiga & {
+			border-color: var(--atss-color-text-icon);
+		}
 	}
 }
 
@@ -695,7 +700,7 @@
 	.components-range-control__number {
 		position: relative;
 		width: 75px;
-		
+
 		&::after {
 			content: 'px';
 			position: absolute;
@@ -706,7 +711,7 @@
 			color: var(--atss-color-text-icon);
 			pointer-events: none;
 		}
-		
+
 		.components-input-control__container {
 			width: 100%;
 		}
@@ -980,11 +985,79 @@
 			outline: none !important;
 			box-shadow: none !important;
 			transition: none !important;
-		}	
+		}
 		&[aria-expanded="true"] {
 			outline: none !important;
 			box-shadow: none !important;
 			transition: none !important;
+		}
+	}
+}
+
+/* Botiga */
+.atss-onboarding-wizard--theme-botiga {
+	.atss-control {
+		label {
+			color: #000;
+			line-height: 1.39;
+		}
+
+		.components-form-toggle {
+			&__track {
+				border: none;
+				height: 17px;
+				width: 27.2px;
+			}
+
+			.components-form-toggle__thumb {
+				background-color: var(--atss-color-background-white);
+				height: 13.6px;
+				top: 1.75px;
+				width: 13.6px;
+			}
+
+			&:not(.is-checked) .components-form-toggle__track {
+				background-color: #8C8F94;
+			}
+
+			&.is-checked {
+				.components-form-toggle__thumb {
+					top: 1.65px;
+					transform: translateX(10px);
+				}
+			}
+		}
+	}
+
+	.atss-social-control {
+		.atss-social-control__item {
+			.atss-social-control__remove {
+				width: 29px;
+
+				span {
+					font-size: 18px;
+				}
+			}
+		}
+	}
+
+	.components-custom-select-control {
+		.components-input-control__container {
+			button + div {
+				margin-top: -12px;
+
+				> div {
+					box-shadow: 0px 12px 24px 0px #00000014, 0px 4px 8px 0px #0000000A;
+				}
+			}
+		}
+
+		&__item {
+			font: {
+				size: 14px;
+				weight: 500;
+			}
+			line-height: 20px;
 		}
 	}
 }

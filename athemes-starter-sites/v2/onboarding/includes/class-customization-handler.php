@@ -75,35 +75,63 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 		 * @return void
 		 */
 		private function apply_site_identity_customizations( $customize_data, $site_title = '' ) {
+			$theme_info = $this->get_theme_info();
+			$theme_slug = $theme_info['slug'];
+			$is_botiga  = 'botiga' === $theme_slug || 'botiga pro' === $theme_slug;
+
 			// Apply site title.
 			if ( ! empty( $site_title ) ) {
 				update_option( 'blogname', sanitize_text_field( $site_title ) );
 			}
 
-			// Apply logo.
-			if ( ! empty( $customize_data['siteLogo']['id'] ) ) {
-				$logo_id = absint( $customize_data['siteLogo']['id'] );
+			$show_site_title = isset( $customize_data['showSiteTitle'] ) ? (bool) $customize_data['showSiteTitle'] : null;
+			$has_site_logo   = ! empty( $customize_data['siteLogo']['id'] );
 
-				// Get the attachment URL from the ID to ensure it exists.
+			// Apply logo.
+			if ( $has_site_logo && ( $is_botiga || true !== $show_site_title ) ) {
+				$logo_id  = absint( $customize_data['siteLogo']['id'] );
 				$logo_url = wp_get_attachment_url( $logo_id );
 
 				if ( $logo_url ) {
-					set_theme_mod( 'site_logo', $logo_url );
+					set_theme_mod( 'custom_logo', $logo_id );
 
-					// Also set logo height if available.
+					if ( $is_botiga ) {
+						set_theme_mod( 'site_logo', $logo_id );
+					}
+
+					// Also set logo size if available.
 					if ( isset( $customize_data['logoHeight'] ) ) {
-						$logo_height = absint( $customize_data['logoHeight'] );
-						set_theme_mod( 'site_logo_size_desktop', $logo_height );
-						set_theme_mod( 'site_logo_size_tablet', $logo_height );
-						set_theme_mod( 'site_logo_size_mobile', $logo_height );
+						$logo_size = absint( $customize_data['logoHeight'] );
+						set_theme_mod( 'site_logo_size_desktop', $logo_size );
+						set_theme_mod( 'site_logo_size_tablet', $logo_size );
+						set_theme_mod( 'site_logo_size_mobile', $logo_size );
 					}
 				}
 			}
 
 			// Apply show/hide site title.
-			if ( isset( $customize_data['showSiteTitle'] ) ) {
-				$show_title = (bool) $customize_data['showSiteTitle'];
-				set_theme_mod( 'logo_site_title', $show_title ? 1 : 0 );
+			if ( null !== $show_site_title ) {
+				if ( $is_botiga ) {
+					set_theme_mod( 'logo_site_title', $show_site_title ? 1 : 0 );
+				}
+
+				if ( $show_site_title ) {
+					$current_header_textcolor = get_theme_mod( 'header_textcolor', '000000' );
+					$header_textcolor         = 'blank' === $current_header_textcolor ? '000000' : $current_header_textcolor;
+
+					set_theme_mod( 'header_textcolor', $header_textcolor );
+
+					// When site title is enabled, remove saved logo image for non-Botiga themes only.
+					if ( ! $is_botiga ) {
+						remove_theme_mod( 'custom_logo' );
+					}
+				} else {
+					set_theme_mod( 'header_textcolor', 'blank' );
+
+					if ( $is_botiga ) {
+						remove_theme_mod( 'site_logo' );
+					}
+				}
 			}
 		}
 
@@ -158,6 +186,12 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 			$theme_info = $this->get_theme_info();
 			$theme_slug = $theme_info['slug'];
 
+			if ( 'botiga' === $theme_slug || 'botiga pro' === $theme_slug ) {
+				$this->apply_botiga_color_customizations( $customize_data, $colors );
+
+				return;
+			}
+
 			// Build mapping of global color names to new hex values.
 			$global_color_values = array();
 
@@ -185,6 +219,106 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 			// For Sydney theme, update all theme mods that reference global colors.
 			if ( ! empty( $global_color_values ) && ( 'sydney' === $theme_slug || 'sydney pro' === $theme_slug ) ) {
 				$this->update_sydney_global_color_references( $global_color_values );
+			}
+		}
+
+		/**
+		 * Apply Botiga color customizations.
+		 *
+		 * @since 1.0.0
+		 * @param array $customize_data The customize data.
+		 * @param array $colors         The custom colors.
+		 * @return void
+		 */
+		private function apply_botiga_color_customizations( $customize_data, $colors ) {
+			$selected_color_scheme = '';
+
+			if ( ! empty( $customize_data['selectedColorScheme'] ) ) {
+				$selected_color_scheme = sanitize_text_field( $customize_data['selectedColorScheme'] );
+			}
+
+			$color_map = array(
+				// General.
+				'--bt-color-bg'                => 'background_color',
+				'--bt-color-body-text'         => 'color_body_text',
+				'--bt-color-content-cards-bg'  => 'content_cards_background',
+
+				// Links.
+				'--bt-color-link-default'      => 'color_link_default',
+				'--bt-color-link-hover'        => 'color_link_hover',
+
+				// Headings.
+				'--bt-color-heading-1'         => 'color_heading_1',
+				'--bt-color-heading-2'         => 'color_heading_2',
+				'--bt-color-heading-3'         => 'color_heading_3',
+				'--bt-color-heading-4'         => 'color_heading_4',
+				'--bt-color-heading-5'         => 'color_heading_5',
+				'--bt-color-heading-6'         => 'color_heading_6',
+
+				// Forms.
+				'--bt-color-forms-text'        => 'color_forms_text',
+				'--bt-color-forms-background'  => 'color_forms_background',
+				'--bt-color-forms-borders'     => 'color_forms_borders',
+				'--bt-color-forms-placeholder' => 'color_forms_placeholder',
+
+				// Buttons.
+				'--bt-color-button-bg'           => 'button_background_color',
+				'--bt-color-button-bg-hover'     => 'button_background_color_hover',
+				'--bt-color-button-border'       => 'button_border_color',
+				'--bt-color-button-border-hover' => 'button_border_color_hover',
+				'--bt-color-button'              => 'button_color',
+				'--bt-color-button-hover'        => 'button_color_hover',
+			);
+
+			foreach ( $color_map as $css_var => $theme_mod ) {
+				if ( empty( $colors[ $css_var ] ) ) {
+					continue;
+				}
+
+				$sanitized_value = sanitize_hex_color( $colors[ $css_var ] );
+
+				if ( ! $sanitized_value ) {
+					continue;
+				}
+
+				set_theme_mod( $theme_mod, $sanitized_value );
+			}
+
+			if ( empty( $selected_color_scheme ) ) {
+				return;
+			}
+
+			if ( 'custom' !== $selected_color_scheme ) {
+				set_theme_mod( 'color_palettes', $selected_color_scheme );
+				set_theme_mod( 'custom_palette_toggle', false );
+				return;
+			}
+
+			set_theme_mod( 'custom_palette_toggle', true );
+
+			$custom_palette_map = array(
+				1 => '--bt-color-button-bg',
+				2 => '--bt-color-button-bg-hover',
+				3 => '--bt-color-heading-1',
+				4 => '--bt-color-body-text',
+				5 => '--bt-color-forms-borders',
+				6 => '--bt-color-content-cards-bg',
+				7 => '--bt-color-bg',
+				8 => '--bt-color-menu-bg',
+			);
+
+			foreach ( $custom_palette_map as $index => $css_var ) {
+				if ( empty( $colors[ $css_var ] ) ) {
+					continue;
+				}
+
+				$sanitized_value = sanitize_hex_color( $colors[ $css_var ] );
+
+				if ( ! $sanitized_value ) {
+					continue;
+				}
+
+				set_theme_mod( 'custom_color' . $index, $sanitized_value );
 			}
 		}
 
@@ -253,14 +387,6 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 				}
 			}
 
-			// Botiga theme mapping.
-			if ( 'botiga' === $theme_slug || 'botiga pro' === $theme_slug ) {
-				// Convert '--botiga-color-primary' to 'color_primary'.
-				if ( preg_match( '/^botiga-(.+)$/', $var_name, $matches ) ) {
-					return str_replace( '-', '_', $matches[1] );
-				}
-			}
-
 			return false;
 		}
 
@@ -283,12 +409,13 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 			// Get theme info.
 			$theme_info = $this->get_theme_info();
 			$theme_slug = $theme_info['slug'];
+			$is_botiga  = 'botiga' === $theme_slug;
 
 			// Apply fonts based on theme.
 			// Both Sydney and Botiga expect JSON format: {"font":"Font Name","regularweight":"700","category":"sans-serif"}
 			$heading_value = wp_json_encode( array(
 				'font' => $heading_font,
-				'regularweight' => '700',
+				'regularweight' => $is_botiga ? '400' : '700',
 				'category' => 'sans-serif',
 			) );
 			$body_value = wp_json_encode( array(
@@ -300,7 +427,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 			if ( 'sydney' === $theme_slug || 'sydney pro' === $theme_slug ) {
 				set_theme_mod( 'sydney_headings_font', $heading_value );
 				set_theme_mod( 'sydney_body_font', $body_value );
-			} elseif ( 'botiga' === $theme_slug ) {
+			} elseif ( $is_botiga ) {
 				set_theme_mod( 'botiga_headings_font', $heading_value );
 				set_theme_mod( 'botiga_body_font', $body_value );
 			}

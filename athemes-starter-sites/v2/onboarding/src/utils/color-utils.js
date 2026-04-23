@@ -203,9 +203,49 @@ export function generateColorScheme( primaryColor, themeName = 'sydney' ) {
 	// Generate the 9 colors with proper CSS variable names for the theme
 	// Ensure theme name is lowercase for CSS variables
 	const themeSlug = themeName.toLowerCase();
-	const colors = {};
-	for ( let i = 1; 9 >= i; i++ ) {
-		colors[ `--${ themeSlug }-global-color-${ i }` ] = colorValues[ i ];
+	let colors = {};
+
+	if ( 'botiga' === themeSlug ) {
+		colors = {
+			'--bt-color-button-bg': colorValues[ 1 ],
+			'--bt-color-button-border': colorValues[ 1 ],
+			'--bt-color-link-default': colorValues[ 1 ],
+
+			'--bt-color-button-bg-hover': colorValues[ 2 ],
+			'--bt-color-button-border-hover': colorValues[ 2 ],
+			'--bt-color-link-hover': colorValues[ 2 ],
+
+			'--bt-color-post-title': colorValues[ 4 ],
+			'--bt-color-forms-text': colorValues[ 4 ],
+			'--bt-color-loop-post-title': colorValues[ 4 ],
+			'--bt-color-heading-1': colorValues[ 4 ],
+			'--bt-color-heading-2': colorValues[ 4 ],
+			'--bt-color-heading-3': colorValues[ 4 ],
+			'--bt-color-heading-4': colorValues[ 4 ],
+			'--bt-color-heading-5': colorValues[ 4 ],
+			'--bt-color-heading-6': colorValues[ 4 ],
+			'--bt-color-menu-text': colorValues[ 4 ],
+
+			'--bt-color-body-text': colorValues[ 3 ],
+			'--bt-color-forms-placeholder': colorValues[ 3 ],
+			'--bt-color-post-meta': colorValues[ 5 ],
+			'--bt-color-loop-post-meta': colorValues[ 5 ],
+			'--bt-color-loop-post-text': colorValues[ 3 ],
+
+			'--bt-color-forms-borders': colorValues[ 8 ],
+			'--bt-color-content-cards-bg': colorValues[ 7 ],
+
+			'--bt-color-bg': colorValues[ 9 ],
+			'--bt-color-button': colorValues[ 9 ],
+			'--bt-color-button-hover': colorValues[ 9 ],
+			'--bt-color-forms-background': colorValues[ 9 ],
+
+			'--bt-color-menu-bg': colorValues[ 9 ]
+		};
+	} else {
+		for ( let i = 1; 9 >= i; i++ ) {
+			colors[ `--${ themeSlug }-global-color-${ i }` ] = colorValues[ i ];
+		}
 	}
 
 	// Calculate contrast ratios and generate warnings
@@ -216,7 +256,7 @@ export function generateColorScheme( primaryColor, themeName = 'sydney' ) {
 	const primaryContrast = calculateContrastRatio( colorValues[ 1 ], backgroundColor );
 	if ( 4.5 > primaryContrast ) {
 		warnings.push({
-			color: `--${ themeSlug }-global-color-1`,
+			color: 'botiga' === themeSlug ? '--bt-color-button-bg' : `--${ themeSlug }-global-color-1`,
 			message: 'Primary color may not have sufficient contrast on light backgrounds. Consider choosing a darker color.',
 			ratio: primaryContrast.toFixed( 2 )
 		});
@@ -226,7 +266,7 @@ export function generateColorScheme( primaryColor, themeName = 'sydney' ) {
 	const bodyTextContrast = calculateContrastRatio( colorValues[ 3 ], backgroundColor );
 	if ( 4.5 > bodyTextContrast ) {
 		warnings.push({
-			color: `--${ themeSlug }-global-color-3`,
+			color: 'botiga' === themeSlug ? '--bt-color-body-text' : `--${ themeSlug }-global-color-3`,
 			message: 'Body text color may not have sufficient contrast on light backgrounds. Consider choosing a darker primary color.',
 			ratio: bodyTextContrast.toFixed( 2 )
 		});
@@ -236,7 +276,7 @@ export function generateColorScheme( primaryColor, themeName = 'sydney' ) {
 	const headingsContrast = calculateContrastRatio( colorValues[ 4 ], backgroundColor );
 	if ( 4.5 > headingsContrast ) {
 		warnings.push({
-			color: `--${ themeSlug }-global-color-4`,
+			color: 'botiga' === themeSlug ? '--bt-color-heading-1' : `--${ themeSlug }-global-color-4`,
 			message: 'Heading color may not have sufficient contrast on light backgrounds. Consider choosing a darker primary color.',
 			ratio: headingsContrast.toFixed( 2 )
 		});
@@ -247,4 +287,3 @@ export function generateColorScheme( primaryColor, themeName = 'sydney' ) {
 		warnings
 	};
 }
-

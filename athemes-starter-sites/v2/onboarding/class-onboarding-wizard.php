@@ -89,7 +89,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		/**
 		 * Load required classes.
-		 * 
+		 *
 		 * @since 1.0.0
 		 * @return void
 		 */
@@ -190,11 +190,11 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			if ( ! isset( $_POST['state'] ) || ! is_string( $_POST['state'] ) ) {
 				wp_send_json_error( esc_html__( 'Missing or invalid state data.', 'athemes-starter-sites' ), 400 );
 			}
-			
+
 			// Sanitization happens in the state manager after decoding.
 			$state_json = wp_unslash( $_POST['state'] );
 			$state = json_decode( $state_json, true );
-			
+
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
 				wp_send_json_error( esc_html__( 'Invalid JSON data.', 'athemes-starter-sites' ), 400 );
 			}
@@ -277,7 +277,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		// Get wizard state.
 		$state = $this->state_manager->get_state();
-		
+
 		if ( empty( $state ) || ! isset( $state['data'] ) ) {
 			wp_send_json_error( esc_html__( 'No wizard state found.', 'athemes-starter-sites' ), 400 );
 		}
@@ -400,7 +400,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		// Check transient cache first.
 		$cache_key = 'atss_demo_pages_' . $demo_id . '_' . $builder;
 		$cached = get_transient( $cache_key );
-		
+
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -605,7 +605,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	private function is_pro_user() {
 		// Check for pro version constants.
 		$is_pro = defined( 'SYDNEY_PRO_VERSION' ) || defined( 'BOTIGA_PRO_VERSION' );
-		
+
 		/**
 		 * Filter whether the current user has pro access.
 		 *
@@ -623,23 +623,23 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	public function get_localized_data() {
 			// Determine dashboard URL based on theme.
 			$theme  = wp_get_theme();
-			$parent = ( get_template_directory() !== get_stylesheet_directory() && $theme->parent() ) 
-				? $theme->parent() 
+			$parent = ( get_template_directory() !== get_stylesheet_directory() && $theme->parent() )
+				? $theme->parent()
 				: $theme;
-			
+
 			// Define theme-specific dashboard URLs.
 			$theme_dashboards = [
 				'Sydney'     => 'admin.php?page=sydney-dashboard',
 				'Sydney Pro' => 'admin.php?page=sydney-dashboard',
 				'Botiga'     => 'admin.php?page=botiga-dashboard',
 			];
-			
+
 			// Check both child and parent theme names.
 			$theme_name  = $theme->name;
 			$parent_name = $parent->name;
-			
-			$dashboard_url = $theme_dashboards[ $theme_name ] 
-				?? $theme_dashboards[ $parent_name ] 
+
+			$dashboard_url = $theme_dashboards[ $theme_name ]
+				?? $theme_dashboards[ $parent_name ]
 				?? 'themes.php';
 
 			$customize_url = admin_url( 'customize.php' );
@@ -653,7 +653,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 					// Remove import URLs (content, widgets, customizer) to keep payload light.
 					// These are fetched server-side during import.
 					unset( $demos[ $demo_id ]['import'] );
-					
+
 					// Keep plugins array as-is - we need slug, path, name for installation.
 					// The plugins array structure is already correct for the import process.
 				}
@@ -671,7 +671,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			// Build upgrade URL with UTM parameters based on theme.
 			$upgrade_url = '';
 			$theme_slug = strtolower( $parent->name );
-			
+
 			if ( 'sydney' === $theme_slug && function_exists( 'sydney_admin_upgrade_link' ) ) {
 				$upgrade_url = sydney_admin_upgrade_link(
 					'https://athemes.com/sydney-upgrade',
@@ -682,32 +682,48 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 					),
 					'onboarding-wizard-link'
 				);
-			} elseif ( 'botiga' === $theme_slug && function_exists( 'botiga_admin_upgrade_link' ) ) {
-				$upgrade_url = botiga_admin_upgrade_link(
-					'https://athemes.com/botiga-upgrade',
+			} elseif ( 'botiga' === $theme_slug ) {
+				$upgrade_url = add_query_arg(
 					array(
 						'utm_source'   => 'onboarding_wizard',
 						'utm_medium'   => 'link',
 						'utm_campaign' => 'Botiga',
 					),
-					'onboarding-wizard-link'
+					'https://athemes.com/botiga-upgrade',
 				);
 			}
 
 			return array(
-				'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-				'nonce'          => wp_create_nonce( 'atss_onboarding_nonce' ),
-				'dashboardUrl'   => esc_url( $dashboard_url ),
-				'themeName'      => esc_html( $parent->name ),
-				'pluginUrl'      => esc_url( ATSS_URL ),
-				'demos'          => $demos,
-				'settings'       => $settings,
-				'currentStarter' => $current_starter,
-				'isProUser'      => $is_pro_user,
-				'upgradeUrl'     => $upgrade_url ? esc_url( $upgrade_url ) : '',
-				'customizeUrl'   => $customize_url ? esc_url( $customize_url ) : '',
-				'adminEmail'     => sanitize_email( get_option( 'admin_email' ) ),
+				'ajaxUrl'                  => admin_url( 'admin-ajax.php' ),
+				'nonce'                    => wp_create_nonce( 'atss_onboarding_nonce' ),
+				'dashboardUrl'             => esc_url( admin_url( $dashboard_url ) ),
+				'themeName'                => esc_html( $parent->name ),
+				'pluginUrl'                => esc_url( ATSS_URL ),
+				'demos'                    => $demos,
+				'settings'                 => $settings,
+				'currentStarter'           => $current_starter,
+				'isProUser'                => $is_pro_user,
+				'upgradeUrl'               => $upgrade_url ? esc_url( $upgrade_url ) : '',
+				'customizeUrl'             => $customize_url ? esc_url( $customize_url ) : '',
+				'adminEmail'               => sanitize_email( get_option( 'admin_email' ) ),
+				'isElementor'              => did_action( 'elementor/loaded' ),
+				'homeUrl'                  => esc_url( home_url( '/' ) ),
+				'isWooOnboardingCompleted' => $this->is_woocommerce_onboarding_completed(),
 			);
+		}
+
+		/**
+		 * Check whether WooCommerce onboarding profile is completed (not skipped).
+		 *
+		 * @since 1.0.0
+		 *
+		 * @return bool
+		 */
+		private function is_woocommerce_onboarding_completed() {
+
+			$onboarding_data = get_option( 'woocommerce_onboarding_profile', array() );
+
+			return isset( $onboarding_data['completed'] ) && true === $onboarding_data['completed'];
 		}
 	}
 }

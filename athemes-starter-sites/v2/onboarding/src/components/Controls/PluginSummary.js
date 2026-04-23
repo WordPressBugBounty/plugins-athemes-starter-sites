@@ -66,7 +66,7 @@ function PluginSummary( { selectedPlugins = [], availablePlugins = [] } ) {
 							dangerouslySetInnerHTML={ { __html: getPluginIcon( plugin.slug ) } }
 						/>
 						<span className="atss-plugin-summary__name">
-							{ plugin.name }
+							{ plugin?.pillName || plugin.name }
 						</span>
 					</div>
 				) ) }

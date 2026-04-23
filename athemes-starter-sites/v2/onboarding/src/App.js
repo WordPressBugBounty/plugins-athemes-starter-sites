@@ -10,6 +10,7 @@ import { Navigation, Spinner } from './components/Layout';
 import ResumeModal from './components/Layout/ResumeModal';
 import wizardSteps from './data/wizard-steps';
 import { useWizard } from './context/WizardContext';
+import themeName from './utils/get-theme-name';
 
 /**
  * Main App component for the onboarding wizard.
@@ -25,7 +26,32 @@ function App() {
 		isLoading,
 		saveState,
 		resetWizard,
+		wizardData,
 	} = useWizard();
+
+	const hasStarter = !! wizardData?.design?.selectedSiteId;
+
+	const getNextStep = ( fromStep, starterSelected = hasStarter ) => {
+		const currentIndex = wizardSteps.findIndex( ( s ) => s.id === fromStep );
+		for ( let i = currentIndex + 1; i < wizardSteps.length; i++ ) {
+			if ( wizardSteps[ i ].requiresStarter && ! starterSelected ) {
+				continue;
+			}
+			return wizardSteps[ i ].id;
+		}
+		return null;
+	};
+
+	const getPrevStep = ( fromStep, starterSelected = hasStarter ) => {
+		const currentIndex = wizardSteps.findIndex( ( s ) => s.id === fromStep );
+		for ( let i = currentIndex - 1; i >= 0; i-- ) {
+			if ( wizardSteps[ i ].requiresStarter && ! starterSelected ) {
+				continue;
+			}
+			return wizardSteps[ i ].id;
+		}
+		return null;
+	};
 
 	// Navigation state for error handling
 	const [ navigationState, setNavigationState ] = useState( {
@@ -96,8 +122,11 @@ function App() {
 	 * @param {Object} stepData Optional data from the step to save.
 	 */
 	const handleContinue = async ( stepData = null ) => {
-		const nextStep = currentStep + 1;
-		const isLastStep = nextStep > wizardSteps.length;
+		const pendingHasStarter =
+			currentStep === 2 ? !! stepData?.selectedSiteId : hasStarter;
+
+		const nextStep = getNextStep( currentStep, pendingHasStarter );
+		const isLastStep = ! nextStep || nextStep > wizardSteps.length;
 
 		// Set loading state and clear any previous errors
 		setNavigationState( { isLoading: true, error: null } );
@@ -118,11 +147,10 @@ function App() {
 	 * Handle going to the previous step.
 	 */
 	const handleBack = () => {
-		// Clear navigation errors when going back
 		setNavigationState( { isLoading: false, error: null } );
 
-		const prevStep = currentStep - 1;
-		if ( prevStep >= 1 ) {
+		const prevStep = getPrevStep( currentStep );
+		if ( prevStep && prevStep >= 1 ) {
 			setCurrentStep( prevStep );
 		}
 	};
@@ -176,7 +204,7 @@ function App() {
 	}
 
 	return (
-		<div className="atss-onboarding-wizard">
+		<div className={`atss-onboarding-wizard ${ themeName ? `atss-onboarding-wizard--theme-${ themeName.toLowerCase() }` : '' }`}>
 			<ResumeModal
 				isOpen={ showResumeModal }
 				onResume={ handleResume }

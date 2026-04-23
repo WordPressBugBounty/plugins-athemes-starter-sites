@@ -15,6 +15,7 @@ import optinImageSydney from '../../assets/images/optin-sydney.jpg';
 import optinImageBotiga from '../../assets/images/optin-botiga.jpg';
 import handsIcon from '../../assets/images/hands.png';
 import heartGif from '../../assets/images/heart.gif';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Optin step component.
@@ -99,6 +100,15 @@ function Optin( { onBack, onContinue } ) {
 		} );
 	};
 
+	const themeText = {
+		wizardTitle: isBotiga
+			? __( 'Stay Updated With the Latest Releases', 'athemes-starter-sites' )
+			: __( 'Stay Updated with Latest Features & Releases', 'athemes-starter-sites' ),
+		newsletterTitle: isBotiga
+			? __( 'Help Make Botiga Better For All!', 'athemes-starter-sites' )
+			: __( 'Help make Sydney better for all!', 'athemes-starter-sites' ),
+	};
+
 	return (
 		<div className="atss-onboarding-wizard__step atss-onboarding-wizard__step--optin">
 			<main className="atss-onboarding-wizard__step-body">
@@ -107,15 +117,16 @@ function Optin( { onBack, onContinue } ) {
 
 					<div className="atss-onboarding-wizard__step-body-content-inner">
 						<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">
-							{ __( 'Stay Updated with Latest Features & Releases', 'athemes-starter-sites' ) }
+							{ themeText.wizardTitle }
 						</h2>
 						<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary">
-							{ __( 'Subscribe to our newsletter to get notified about new updates, features, and releases', 'athemes-starter-sites' ) }
+							{ __( 'Subscribe to our newsletter to get notified about new updates, features, and releases.', 'athemes-starter-sites' ) }
 						</p>
 
 						<div className={ `atss-form-field w100${ emailError ? ' atss-form-field--has-error' : '' }` }>
 							<TextControl
 								label={ __( 'Email', 'athemes-starter-sites' ) }
+								placeholder={ __( 'Enter your email address', 'athemes-starter-sites' ) }
 								value={ email }
 								onChange={ handleEmailChange }
 								onBlur={ handleEmailBlur }
@@ -146,7 +157,7 @@ function Optin( { onBack, onContinue } ) {
 
 							<div className="atss-optin-box__text">
 								<h3 className="atss-optin-box__title">
-									{ __( 'Help make Sydney better for all!', 'athemes-starter-sites' ) }
+									{ themeText.newsletterTitle }
 								</h3>
 								<p className="atss-optin-box__description">
 									{ createInterpolateElement(

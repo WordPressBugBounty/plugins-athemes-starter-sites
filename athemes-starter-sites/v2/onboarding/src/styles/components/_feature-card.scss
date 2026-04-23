@@ -154,3 +154,126 @@
 		transform: translate(-50%, -50%);
 	}
 }
+
+/* Botiga Cards */
+.atss-onboarding-wizard--theme-botiga {
+	.atss-feature-card {
+		&:hover {
+			border-color: var(--atss-color-background-surface);
+			box-shadow: 0 4px 5px 0 #0000000D, 0 1px 2px 0 #0000000D;
+		}
+
+		&--selected {
+			&:hover {
+				border-color: var(--atss-color-accent-hover);
+			}
+		}
+
+		&--disabled {
+			opacity: 1;
+		}
+
+		&__description {
+			span {
+				color: var(--atss-color-text-primary)
+			}
+		}
+
+		&__badge {
+			font-weight: 700;
+
+			&--recommended {
+				background-color: #FAE6F0;
+				color:  #DF5B9A;
+			}
+
+			&--required {
+				background-color: var(--atss-color-accent-light);
+				color: var(--atss-color-accent);
+			}
+		}
+
+		&__checkbox {
+			border-width: 1px;
+			border-radius: 3px;
+		}
+
+		&--merchant {
+			align-items: center;
+			background: linear-gradient(97.48deg, var(--atss-color-background-white) 35.78%, var(--atss-color-accent-light) 100.19%);
+			border-radius: 12px;
+			border-width: 2px;
+			display: grid;
+			gap: var(--atss-spacing-xl) 30px;
+			grid-column: 1 / 3;
+			grid-template-areas: 'content image' 'checkbox image';
+			grid-template-columns: 1fr 1fr;
+			margin-bottom: var(--atss-spacing-xs);
+			padding: 40px;
+
+			@media (max-width: 870px) {
+				grid-template-areas:
+					"image"
+					"content"
+					"checkbox";
+				grid-template-columns: 1fr;
+			}
+
+			.atss-feature-card {
+				&__title-wrapper {
+					gap: var(--atss-spacing-xl);
+				}
+
+				&__content {
+					grid-area: content;
+				}
+
+				&__checkbox-wrapper {
+					align-items: center;
+					display: flex;
+					justify-content: space-between;
+					background-color: var(--atss-color-accent-light);
+					border-radius: var(--atss-radius-md);
+					grid-area: checkbox;
+					padding: 10px var(--atss-spacing-md);
+
+					&::before {
+						content: attr(aria-label);
+						font: {
+							size: var(--atss-font-size-sm);
+							weight: 500;
+						}
+						line-height: 1.39;
+					}
+				}
+
+				&__title {
+					font-size: 18px;
+					order: 2;
+					text-align: start;
+					width: 100%;
+				}
+
+				&__icon {
+					display: none;
+				}
+			}
+
+			img {
+				grid-area: image;
+				height: auto;
+				margin-inline: auto;
+				max-width: 100%;
+			}
+		}
+
+		&--woocommerce,
+		&--gutenberg {
+			.atss-feature-card__icon {
+				svg {
+					width: 18px;
+				}
+			}
+		}
+	}
+}

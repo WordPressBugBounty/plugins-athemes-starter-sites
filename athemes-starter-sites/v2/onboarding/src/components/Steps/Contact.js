@@ -13,6 +13,7 @@ import { validateEmail } from '../../utils/helpers';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import SocialControl from '../Controls/SocialControl';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Contact step component.
@@ -74,22 +75,34 @@ function Contact( { onBack, onSkip, onContinue, navigationLoading, navigationErr
 		} );
 	};
 
+	const themeText = {
+		wizardDescription: isBotiga
+			? __( 'Please provide the contact information below. These will be used on your shop.', 'athemes-starter-sites' )
+			: __( 'Please provide the contact information below. This will be used on the website.', 'athemes-starter-sites' ),
+		addressLabel: isBotiga
+			? __( 'Local Address', 'athemes-starter-sites' )
+			: __( 'Address', 'athemes-starter-sites' ),
+		socialLabel: isBotiga
+			? __( 'Social Media', 'athemes-starter-sites' )
+			: __( 'Social media links', 'athemes-starter-sites' ),
+	};
+
 	return (
 		<div className="atss-onboarding-wizard__step atss-onboarding-wizard__step--contact">
 			<main className="atss-onboarding-wizard__step-body">
 				<div className="atss-onboarding-wizard__step-body-content">
 					<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">
-						{ __( 'How do people get in touch with ', 'athemes-starter-sites' ) }{ siteName }?
+						{ __( 'How Do People Get in Touch With ', 'athemes-starter-sites' ) }{ siteName }?
 					</h2>
 					<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary">
-						{ __( 'Please provide the contact information below. This will be used on the website.', 'athemes-starter-sites' ) }
+						{ themeText.wizardDescription }
 					</p>
 
 					<div className="atss-onboarding-wizard__step-body-form atss-options-form flex flex-col gap-xxl">
 						<div className="atss-form-row flex gap-xxl">
 							<div className={ `atss-form-field atss-form-field--email${ emailError ? ' atss-form-field--has-error' : '' }` }>
 								<TextControl
-									label={ __( 'Business email', 'athemes-starter-sites' ) }
+									label={ __( 'Business Email', 'athemes-starter-sites' ) }
 									value={ businessEmail }
 									onChange={ handleEmailChange }
 									onBlur={ handleEmailBlur }
@@ -108,7 +121,7 @@ function Contact( { onBack, onSkip, onContinue, navigationLoading, navigationErr
 							</div>
 							<div className="atss-form-field">
 								<label className="components-base-control__label">
-									{ __( 'Phone number', 'athemes-starter-sites' ) }
+									{ __( 'Phone Number', 'athemes-starter-sites' ) }
 								</label>
 								<PhoneInput
 									defaultCountry="us"
@@ -120,7 +133,7 @@ function Contact( { onBack, onSkip, onContinue, navigationLoading, navigationErr
 
 						<div className="atss-form-field">
 							<TextControl
-								label={ __( 'Address', 'athemes-starter-sites' ) }
+								label={ themeText.addressLabel }
 								value={ address }
 								onChange={ ( value ) => setAddress( value ) }
 								placeholder={ __( 'e.g. 123 Main St, Anytown, USA', 'athemes-starter-sites' ) }
@@ -131,7 +144,7 @@ function Contact( { onBack, onSkip, onContinue, navigationLoading, navigationErr
 
 						<div className="atss-form-field">
 							<SocialControl
-								label={ __( 'Social media links', 'athemes-starter-sites' ) }
+								label={ themeText.socialLabel }
 								value={ socialLinks }
 								onChange={ setSocialLinks }
 							/>

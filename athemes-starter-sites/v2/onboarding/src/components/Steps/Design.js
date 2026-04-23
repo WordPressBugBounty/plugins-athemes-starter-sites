@@ -22,13 +22,13 @@ import { useWizard } from '../../context/WizardContext';
  * @param {Function} props.onContinue Callback to proceed to next step.
  * @return {JSX.Element} Design component.
  */
-function Design( { onBack, onContinue } ) {
+function Design( { onBack, onContinue, onSkip, navigationLoading, navigationError } ) {
 	const { wizardData, setPrefetchedPages, updateStepData, builder, setBuilder } = useWizard();
 	const starterSites = getStarterSites();
 
 	// Get the initial builder from context
 	const initialBuilder = builder || 'gutenberg';
-	
+
 	// Build type options for the filter control
 	const typeOptions = [
 		{ key: 'all', name: __( 'All', 'athemes-starter-sites' ) },
@@ -59,10 +59,15 @@ function Design( { onBack, onContinue } ) {
 		return categoryOptions[ 0 ]; // Default to "All Categories"
 	};
 
+	// Local selection state — card click sets this, Continue saves it
+	const [ selectedCardId, setSelectedCardId ] = useState(
+		wizardData?.design?.selectedSiteId || null
+	);
+
 	// State for search and builder filter
 	const [ searchQuery, setSearchQuery ] = useState( '' );
 	const [ selectedBuilder, setSelectedBuilder ] = useState( builder || 'gutenberg' );
-	
+
 	// State for type and category filters
 	const [ selectedType, setSelectedType ] = useState( typeOptions[ 0 ] );
 	const [ selectedCategory, setSelectedCategory ] = useState( getInitialCategory() );
@@ -95,32 +100,37 @@ function Design( { onBack, onContinue } ) {
 		return starterSites.filter( ( site ) => {
 			// Filter by builder
 			const matchesBuilder = site.builders?.includes( selectedBuilder );
-			
+
 			// Filter by type (free/pro)
 			const matchesType = selectedType.key === 'all' || site.type === selectedType.key;
-			
+
 			// Filter by category
-			const matchesCategory = selectedCategory.key === 'all' || 
+			const matchesCategory = selectedCategory.key === 'all' ||
 				site.categories?.includes( selectedCategory.key );
-			
+
 			// Filter by search query (name and categories)
-			const matchesSearch = ! searchQuery || 
+			const matchesSearch = ! searchQuery ||
 				site.name?.toLowerCase().includes( searchQuery.toLowerCase() ) ||
 				site.categories?.some( ( cat ) => cat.toLowerCase().includes( searchQuery.toLowerCase() ) );
-			
 			return matchesBuilder && matchesType && matchesCategory && matchesSearch;
 		} );
 	}, [ starterSites, selectedBuilder, selectedType, selectedCategory, searchQuery ] );
+
+	const handleContinue = () => {
+		onContinue( {
+			selectedSiteId: selectedCardId,
+		} );
+	};
 
 	return (
 		<div className="atss-onboarding-wizard__step atss-onboarding-wizard__step--design">
 			<main className="atss-onboarding-wizard__step-body">
 				<div className="atss-onboarding-wizard__step-body-content w100">
 					<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">
-						{ __( 'Select template to start with', 'athemes-starter-sites' ) }
+						{ __( 'Select a Template to Start With', 'athemes-starter-sites' ) }
 					</h2>
 					<p className="atss-onboarding-wizard__step-body-description w100 text-sm text-secondary">
-						{ __( 'Choose a template that matches your style. You can customize everything later to make it uniquely yours', 'athemes-starter-sites' ) }
+						{ __( 'Choose a template that matches your style. You can customize everything later to make it uniquely yours.', 'athemes-starter-sites' ) }
 					</p>
 
 					{ /* Search and Filter Control */ }
@@ -157,24 +167,22 @@ function Design( { onBack, onContinue } ) {
 									thumbnail={ site.thumbnail }
 									preview={ site.preview }
 									type={ site.type }
+									isSelected={ selectedCardId === site.id }
 									onSelect={ ( siteId ) => {
-										// Clear prefetched pages when a new design is selected
-										// This ensures fresh pages are fetched for the new design
+										if ( siteId === selectedCardId ) {
+											setSelectedCardId( null );
+											onContinue( {
+												selectedSiteId: siteId,
+											} );
+											return;
+										}
 										setPrefetchedPages( null );
-
-										// Clear selected pages when a new design is selected
-										// This ensures we don't have stale page IDs from a previous site
 										updateStepData( 'pages', { selectedPages: [] } );
-
-										// Check if builder has changed from the initial builder
 										const hasBuilderChanged = selectedBuilder !== initialBuilder;
-
-										// If builder changed, clear features data
 										if ( hasBuilderChanged ) {
 											updateStepData( 'features', {} );
 										}
-
-										// Save the selected demo
+										setSelectedCardId( siteId );
 										onContinue( {
 											selectedSiteId: siteId,
 										} );
@@ -193,9 +201,15 @@ function Design( { onBack, onContinue } ) {
 
 			<Footer
 				showBack={ true }
-				showSkip={ false }
+				showSkip={ true }
 				showContinue={ false }
+				continueText={ __( 'Continue', 'athemes-starter-sites' ) }
 				onBack={ onBack }
+				onSkip={ onSkip }
+				onContinue={ handleContinue }
+				continueDisabled={ ! selectedCardId }
+				continueLoading={ navigationLoading }
+				continueError={ navigationError }
 			/>
 		</div>
 	);

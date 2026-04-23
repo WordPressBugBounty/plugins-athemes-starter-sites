@@ -15,8 +15,10 @@ import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
-import { importAjaxRequest } from '../../utils/api';
+import { importAjaxRequest, deleteWizardState } from '../../utils/api';
 import Complete from '../Layout/Complete';
+import pluginInfo from '../../data/plugin-info';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Send email to Drip if user opted in.
@@ -55,6 +57,21 @@ const sendEmailToDrip = ( wizardData ) => {
 };
 
 /**
+ * Plugin paths for the no-starter flow.
+ * Used when installing fallback plugins without a demo config.
+ */
+const FALLBACK_PLUGIN_PATHS = {
+	woocommerce: { path: 'woocommerce/woocommerce.php', name: 'WooCommerce' },
+	'wpforms-lite': { path: 'wpforms-lite/wpforms.php', name: 'WPForms Lite' },
+	'wp-mail-smtp': { path: 'wp-mail-smtp/wp_mail_smtp.php', name: 'WP Mail SMTP' },
+	'all-in-one-seo-pack': { path: 'all-in-one-seo-pack/all_in_one_seo_pack.php', name: 'All in One SEO' },
+	'sugar-calendar-lite': { path: 'sugar-calendar-lite/sugar-calendar-lite.php', name: 'Sugar Calendar Lite' },
+	merchant: { path: 'merchant/merchant.php', name: 'Merchant' },
+};
+
+const NON_INSTALLABLE_PLUGIN_SLUGS = [ 'gutenberg' ];
+
+/**
  * Build the import steps array based on wizard data.
  *
  * @param {Object} wizardData The wizard state data.
@@ -70,15 +87,17 @@ const getImportSteps = ( wizardData, builder ) => {
 	const features = wizardData.features || {};
 	const selectedPlugins = features.selectedPlugins || [];
 
-	// 1. Start import.
-	steps.push( {
-		action: 'atss_import_start',
-		log: __( 'Starting import...', 'athemes-starter-sites' ),
-		priority: 1,
-	} );
+	// 1. Start import (only when importing a starter — PHP validates demo_id).
+	if ( demoId ) {
+		steps.push( {
+			action: 'atss_import_start',
+			log: __( 'Starting import...', 'athemes-starter-sites' ),
+			priority: 1,
+		} );
+	}
 
-	// 2. Clean previous import (conditional).
-	if ( cleanInstall ) {
+	// 2. Clean previous import (conditional — only when a starter is being imported).
+	if ( cleanInstall && demoId ) {
 		steps.push( {
 			action: 'atss_import_clean',
 			log: __( 'Cleaning previous import...', 'athemes-starter-sites' ),
@@ -86,58 +105,89 @@ const getImportSteps = ( wizardData, builder ) => {
 		} );
 	}
 
-	// 3. Install plugins (one step per plugin).
-	const demo = demos[ demoId ];
-	if ( demo && demo.plugins && selectedPlugins.length > 0 ) {
-		// Fallback plugins that may be dynamically added (e.g., Elementor when selected as builder).
-		const fallbackPlugins = {
-			'elementor': {
-				slug: 'elementor',
-				path: 'elementor/elementor.php',
-				name: 'Elementor',
-			},
-		};
+	// 3. Install plugins.
+	if ( demoId ) {
+		// Demo-based plugin install.
+		const demo = demos[ demoId ];
+		if ( demo && demo.plugins && selectedPlugins.length > 0 ) {
+			const fallbackPlugins = {
+				'elementor': {
+					slug: 'elementor',
+					path: 'elementor/elementor.php',
+					name: 'Elementor',
+				},
+				'all-in-one-seo-pack': {
+					slug: 'all-in-one-seo-pack',
+					path: 'all-in-one-seo-pack/all_in_one_seo_pack.php',
+					name: 'All in One SEO',
+				},
+				'athemes-blocks': {
+					slug: 'athemes-blocks',
+					path: 'athemes-blocks/athemes-blocks.php',
+					name: 'aThemes Blocks',
+				},
+				'athemes-addons-for-elementor-lite': {
+					slug: 'athemes-addons-for-elementor-lite',
+					path: 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
+					name: 'aThemes Addons',
+				},
+			};
 
+			selectedPlugins.forEach( ( slug ) => {
+				let plugin = demo.plugins.find( ( p ) => p.slug === slug );
+				if ( ! plugin && fallbackPlugins[ slug ] ) {
+					plugin = fallbackPlugins[ slug ];
+				}
+				if ( plugin ) {
+					steps.push( {
+						action: 'atss_import_plugin',
+						slug: plugin.slug,
+						path: plugin.path,
+						log: __( 'Installing', 'athemes-starter-sites' ) + ' ' + plugin.name + '...',
+						priority: 3,
+					} );
+				}
+			} );
+		}
+	} else if ( selectedPlugins.length > 0 ) {
+		// No-starter flow: install from fallback paths.
 		selectedPlugins.forEach( ( slug ) => {
-			let plugin = demo.plugins.find( ( p ) => p.slug === slug );
-
-			// Handle dynamically added plugins not defined in demo.plugins.
-			if ( ! plugin && fallbackPlugins[ slug ] ) {
-				plugin = fallbackPlugins[ slug ];
+			if ( NON_INSTALLABLE_PLUGIN_SLUGS.includes( slug ) ) {
+				return;
 			}
-
-			if ( plugin ) {
+			const info = FALLBACK_PLUGIN_PATHS[ slug ];
+			if ( info ) {
 				steps.push( {
 					action: 'atss_import_plugin',
-					slug: plugin.slug,
-					path: plugin.path,
-					log: __( 'Installing', 'athemes-starter-sites' ) + ' ' + plugin.name + '...',
+					slug: slug,
+					path: info.path,
+					log: __( 'Installing', 'athemes-starter-sites' ) + ' ' + info.name + '...',
 					priority: 3,
 				} );
 			}
 		} );
 	}
 
-	// 4. Import content.
-	steps.push( {
-		action: 'atss_import_contents',
-		log: __( 'Importing content...', 'athemes-starter-sites' ),
-		priority: 4,
-	} );
+	// 4-6. Content, widgets, customizer — only when importing a starter.
+	if ( demoId ) {
+		steps.push( {
+			action: 'atss_import_contents',
+			log: __( 'Importing content...', 'athemes-starter-sites' ),
+			priority: 4,
+		} );
 
-	// 5. Import widgets.
-	steps.push( {
-		action: 'atss_import_widgets',
-		log: __( 'Importing widgets...', 'athemes-starter-sites' ),
-		priority: 5,
-	} );
+		steps.push( {
+			action: 'atss_import_widgets',
+			log: __( 'Importing widgets...', 'athemes-starter-sites' ),
+			priority: 5,
+		} );
 
-	// 6. Import customizer settings.
-	steps.push( {
-		action: 'atss_import_customizer',
-		log: __( 'Importing customizer settings...', 'athemes-starter-sites' ),
-		priority: 6,
-	} );
+		steps.push( {
+			action: 'atss_import_customizer',
+			log: __( 'Importing customizer settings...', 'athemes-starter-sites' ),
+			priority: 6,
+		} );
+	}
 
 	// 7. Apply wizard customizations (logo, colors, typography, site title).
 	steps.push( {
@@ -146,12 +196,16 @@ const getImportSteps = ( wizardData, builder ) => {
 		priority: 7,
 	} );
 
-	// 8. Finish import.
-	steps.push( {
-		action: 'atss_import_finish',
-		log: __( 'Finishing import...', 'athemes-starter-sites' ),
-		priority: 8,
-	} );
+	// 8. Finish import (only when importing a starter — PHP validates demo_id).
+	if ( demoId ) {
+		steps.push( {
+			action: 'atss_import_finish',
+			log: isBotiga ?
+				__( 'Compiling Composer Elements', 'athemes-starter-sites' ) :
+				__( 'Finishing import...', 'athemes-starter-sites' ),
+			priority: 8,
+		} );
+	}
 
 	return steps;
 };
@@ -262,6 +316,11 @@ function Import( { onContinue } ) {
 			}
 		}
 
+		// No-starter flow: clear wizard state (atss_import_finish handles this for starter flow).
+		if ( ! demoId ) {
+			await deleteWizardState();
+		}
+
 		// Import complete.
 		setProgress( 100 );
 		setStatus( __( 'Import complete!', 'athemes-starter-sites' ) );
@@ -271,11 +330,11 @@ function Import( { onContinue } ) {
 
 	// Start import on component mount.
 	useEffect( () => {
-		if ( ! importStarted && demoId ) {
+		if ( ! importStarted ) {
 			setImportStarted( true );
 			executeImport();
 		}
-	}, [ importStarted, demoId, executeImport ] );
+	}, [ importStarted, executeImport ] );
 
 	// Error state.
 	if ( error ) {
@@ -318,6 +377,12 @@ function Import( { onContinue } ) {
 		return <Complete />;
 	}
 
+	const themeText = {
+		wizardTitle: isBotiga
+			? __( 'We’re Building Your Shop...', 'athemes-starter-sites' )
+			: __( 'We Are Building Your Website...', 'athemes-starter-sites' ),
+	};
+
 	// Progress state (default).
 	return (
 		<div className="atss-onboarding-wizard__step atss-onboarding-wizard__step--import">
@@ -327,10 +392,10 @@ function Import( { onContinue } ) {
 						<Spinner />
 					</div>
 					<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">
-						{ __( 'We are building your website...', 'athemes-starter-sites' ) }
+						{ themeText.wizardTitle }
 					</h2>
 					<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary w100">
-						{ __( 'Please be patient and don\'t refresh this page, the import process may take a while', 'athemes-starter-sites' ) }
+						{ __( 'Please be patient and don’t refresh this page, the import process may take a while.', 'athemes-starter-sites' ) }
 					</p>
 					<div className="atss-import-progress">
 						<div className="atss-import-progress__header flex justify-between items-center gap-xs">

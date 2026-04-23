@@ -171,3 +171,60 @@
 	width: 100%;
 	justify-content: start;
 }
+
+/* Botiga */
+.atss-onboarding-wizard--theme-botiga {
+	.atss-onboarding-wizard__step--pages {
+		.atss-control__label {
+			color: #000;
+		}
+	}
+
+	.atss-pages-grid {
+		gap: var(--atss-spacing-md) var(--atss-spacing-xs);
+		grid-template-columns: 1fr 1fr;
+	}
+
+	.atss-page-card {
+		&:not(.atss-page-card--selected) {
+			border-color: var(--atss-color-border);
+		}
+
+		&__info {
+			border-top-color: var(--atss-color-background-surface);
+		}
+
+		&__hover-overlay {
+			background-color: #101517B2;
+			width: 36px;
+			height: 36px;
+
+			svg {
+				width: 28px;
+				height: 28px;
+				transform: rotate(-90deg);
+			}
+		}
+
+		&:hover {
+			.atss-page-card__hover-overlay {
+				opacity: 1;
+			}
+		}
+
+		&__checkbox {
+			border-radius: 0 0 0 3px;
+			outline: none;
+			top: -1px;
+
+			&:not(.atss-page-card__checkbox--checked) {
+				border-color: var(--atss-color-border);
+			}
+		}
+
+		&__loading svg {
+			width: 32px;
+			height: 32px;
+		}
+	}
+}

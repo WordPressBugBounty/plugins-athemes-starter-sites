@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 6.8.3
 Requires PHP: 5.4
-Stable tag: 1.1.7
+Stable tag: 1.1.8
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,12 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+
+= 1.1.8 =
+* Onboarding wizard support for Botiga
+* Skip/Continue flow for the Design step (no-starter wizard path)
+* Fix: customize upsell displaying for pro users
+* Fix: default theme fallback when themeName is undefined in preview image URL
 
 = 1.1.6 =
 * Onboarding wizard support for Sydney

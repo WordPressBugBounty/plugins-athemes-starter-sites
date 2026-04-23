@@ -21,7 +21,7 @@ import { getPreviewImageUrl } from '../../utils/helpers';
  * @param {boolean}  props.isPreloaded Whether this card was preloaded.
  * @return {JSX.Element} Card component.
  */
-function Card( { id, name, thumbnail, preview, type, onSelect, isPreloaded = false } ) {
+function Card( { id, name, thumbnail, preview, type, onSelect, isPreloaded = false, isSelected = false } ) {
 	const [ isHovered, setIsHovered ] = useState( false );
 	const [ isScrolling, setIsScrolling ] = useState( false );
 	const imgRef = useRef( null );
@@ -88,13 +88,14 @@ function Card( { id, name, thumbnail, preview, type, onSelect, isPreloaded = fal
 
 	return (
 		<div
-			className="atss-starter-card"
+			className={ `atss-starter-card${ isSelected ? ' atss-starter-card--selected' : '' }` }
 			onMouseEnter={ handleMouseEnter }
 			onMouseLeave={ handleMouseLeave }
 			onClick={ handleCardClick }
 			role="button"
 			tabIndex={ 0 }
 			onKeyDown={ handleKeyDown }
+			aria-pressed={ isSelected }
 		>
 			<div className="atss-starter-card__preview" ref={ previewRef }>
 				{ /* Preview image */ }

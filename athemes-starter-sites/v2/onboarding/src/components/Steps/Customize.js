@@ -27,7 +27,12 @@ import {
 	useSiteTitlePreviewSync,
 	useTypographyPreviewSync,
 } from '../../utils/use-preview-sync';
-
+import isBotiga from '../../utils/is-botiga';
+import previewBridge from '../../utils/preview-bridge';
+import {
+	buildBotigaNonVariableCss,
+	buildBotigaScopedVariableOverrideCss
+} from '../../data/botiga-non-variable-color-rules';
 /**
  * Customize step component.
  *
@@ -74,7 +79,8 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 	const isProUser = window.atssOnboarding?.isProUser || false;
 	const isProTemplate = selectedSite?.type === 'pro' && ! isProUser;
 
-	// Initialize preview bridge
+	// Initialize preview bridge — use direct DOM mode for local site preview
+	previewBridge.setLocalPreview( ! selectedSiteId );
 	usePreviewBridgeInit( iframeRef );
 
 	// Sync data with preview
@@ -89,6 +95,10 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 	// When switching to custom, clear customColors so they can be regenerated from primary color
 	useEffect( () => {
 		if ( selectedColorScheme === 'custom' ) {
+			if ( isBotiga ) {
+				return;
+			}
+
 			// Clear customColors when switching to custom mode
 			// CustomColorsControl will regenerate them from the primary color
 			setCustomColors( {} );
@@ -99,9 +109,53 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 			}
 		}
 	}, [ selectedColorScheme, colorSchemes ] );
+
+	useEffect( () => {
+		if ( ! isBotiga ) {
+			return;
+		}
+
+		let colors = null;
+
+		if ( selectedColorScheme === 'custom' ) {
+			colors = customColors;
+		} else if ( selectedColorScheme && colorSchemes.length > 0 ) {
+			const scheme = colorSchemes.find(
+				( item ) => item.id === selectedColorScheme
+			);
+
+			if ( scheme?.colors ) {
+				colors = scheme.colors;
+			}
+		}
+
+		if ( ! colors || 0 === Object.keys( colors ).length ) {
+			previewBridge.resetCustomCss( 'atss-botiga-non-variable-colors' );
+			return;
+		}
+
+		const non_variable_css = buildBotigaNonVariableCss( colors );
+		const scoped_variable_css =
+			buildBotigaScopedVariableOverrideCss( colors );
+
+		const css = [ scoped_variable_css, non_variable_css ]
+			.filter( Boolean )
+			.join( '\n\n' );
+
+		if ( ! css ) {
+			previewBridge.resetCustomCss( 'atss-botiga-non-variable-colors' );
+			return;
+		}
+
+		previewBridge.updateCustomCss(
+			css,
+			'atss-botiga-non-variable-colors'
+		);
+	}, [ selectedColorScheme, colorSchemes, customColors ] );
+
 	useLogoPreviewSync( siteLogo, logoHeight );
 	useLogoHeightPreviewSync( logoHeight );
-	useSiteTitlePreviewSync( siteTitle, showSiteTitle );
+	useSiteTitlePreviewSync( siteTitle, showSiteTitle, siteLogo );
 	useTypographyPreviewSync( selectedTypographyPair, typographyPairs );
 
 	// Get the site data and preview URL
@@ -116,6 +170,10 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 					// Clean up double dashes in URL
 					if ( selectedSiteId !== 'resume' ) {
 						url = url.replace( /--/g, '-' );
+					}
+
+					if ( isBotiga ) { // Leave early, if Botiga is in use.
+						return url;
 					}
 					// Transform: https://demo.athemes.com/sydney-main/ → https://demo.athemes.com/sydney-main-gb/
 					url = url.replace( /\/([^\/\?]+)(\/)?(\?.*)?$/, '/$1-gb$2$3' );
@@ -132,8 +190,8 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 				return url;
 			}
 		}
-		// Fallback to default preview URL
-		return 'https://athemes.com/';
+		// No starter selected — show user's own site
+		return window.atssOnboarding?.homeUrl || window.location.origin;
 	}, [ selectedSiteId, builder ] );
 
 	// Add preconnect hints for faster iframe loading
@@ -156,6 +214,26 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 	// Handle iframe load - also prefetch pages for the next step
 	const handleIframeLoad = async () => {
 		setIsIframeLoading( false );
+
+		// Hide admin bar in local preview for a cleaner look
+		if ( ! selectedSiteId ) {
+			try {
+				const doc = iframeRef.current?.contentDocument;
+				const adminBar = doc?.getElementById( 'wpadminbar' );
+				if ( adminBar ) {
+					adminBar.remove();
+				}
+				if ( doc?.documentElement ) {
+					doc.documentElement.style.setProperty( 'margin-top', '0', 'important' );
+				}
+				if ( doc?.body ) {
+					doc.body.classList.remove( 'admin-bar' );
+					doc.body.style.setProperty( 'margin-top', '0', 'important' );
+				}
+			} catch ( e ) {
+				// Cross-origin fallback — ignore
+			}
+		}
 
 		// Prefetch pages for the Pages step if not already fetched for this site
 		// Note: prefetchedPages are cleared when design changes (in Design.js)
@@ -215,6 +293,17 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 		} );
 	};
 
+	const themeText = {
+		siteLogo: isBotiga
+			? __( 'Upload Site Logo', 'athemes-starter-sites' )
+			: __( 'Upload Logo', 'athemes-starter-sites' ),
+		siteLogoSize: isBotiga
+			? __( 'Logo Width', 'athemes-starter-sites' )
+			: __( 'Logo Height', 'athemes-starter-sites' ),
+		siteLogoSizeMin: isBotiga ? 0 : 30,
+		siteLogoSizeMax: isBotiga ? 500 : 125,
+	};
+
 	return (
 		<div className="atss-onboarding-wizard__step-wrapper flex">
 			<div className="atss-onboarding-wizard__step atss-onboarding-wizard__step--customize">
@@ -224,16 +313,16 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 						value={ siteLogo.url }
 						id={ siteLogo.id }
 						onChange={ handleLogoChange }
-						buttonText={ __( 'Upload Logo', 'athemes-starter-sites' ) }
+						buttonText={ themeText.siteLogo }
 					/>
 
 					{ siteLogo.url && (
 						<RangeControl
-							label={ __( 'Logo Height', 'athemes-starter-sites' ) }
+							label={ themeText.siteLogoSize }
 							value={ logoHeight }
 							onChange={ setLogoHeight }
-							min={ 30 }
-							max={ 125 }
+							min={ themeText.siteLogoSizeMin }
+							max={ themeText.siteLogoSizeMax }
 							className="atss-control"
 						/>
 					) }

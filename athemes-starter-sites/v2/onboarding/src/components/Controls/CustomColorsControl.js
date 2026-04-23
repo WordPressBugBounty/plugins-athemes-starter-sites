@@ -10,6 +10,7 @@ import { ColorPicker, Popover, Icon } from '@wordpress/components';
 import { rotateLeft } from '@wordpress/icons';
 import { generateColorScheme } from '../../utils/color-utils';
 import previewBridge from '../../utils/preview-bridge';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Custom Colors Control component.
@@ -32,7 +33,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 	const [ contrastWarnings, setContrastWarnings ] = useState( [] );
 	const [ isPickerOpen, setIsPickerOpen ] = useState( false );
 	const colorSwatchRef = useRef( null );
-	
+
 	/**
 	 * Get the first 3 colors from a color scheme.
 	 *
@@ -40,12 +41,21 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 	 * @return {Array} Array of color values.
 	 */
 	const getFirstThreeColors = ( scheme ) => {
-		if ( ! scheme || ! scheme.colors ) {
+		if ( ! scheme?.colors ) {
 			return [];
 		}
-		
-		const colorValues = Object.values( scheme.colors );
-		return colorValues.slice( 0, 3 );
+
+		const uniqueColors = [];
+
+		Object.values( scheme.colors ).forEach( ( color ) => {
+			if ( uniqueColors.includes( color ) ) {
+				return;
+			}
+
+			uniqueColors.push( color );
+		} );
+
+		return uniqueColors.slice( 0, 3 );
 	};
 
 	/**
@@ -58,7 +68,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 			onChange( schemeId );
 		}
 	};
-	
+
 	/**
 	 * Handle reset action.
 	 */
@@ -79,7 +89,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 		// Reset colors in the preview iframe
 		previewBridge.resetColors();
 	};
-	
+
 	/**
 	 * Handle custom primary color change.
 	 *
@@ -87,12 +97,12 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 	 */
 	const handlePrimaryColorChange = ( color ) => {
 		setCustomPrimaryColor( color );
-		
+
 		// Generate the color scheme with the theme name for proper CSS variable format
 		const scheme = generateColorScheme( color, themeName );
 		setGeneratedColors( scheme.colors );
 		setContrastWarnings( scheme.warnings );
-		
+
 		// Notify parent component of generated colors and primary color
 		if ( onCustomColors ) {
 			onCustomColors( scheme.colors );
@@ -101,7 +111,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 			onPrimaryColorChange( color );
 		}
 	};
-	
+
 	/**
 	 * Sync state with props from parent when they change.
 	 * Only sync if we're not on custom mode, or if the colors are actually custom-generated.
@@ -113,13 +123,13 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 			setGeneratedColors( customColors );
 		}
 	}, [ customColors, value ] );
-	
+
 	useEffect( () => {
 		if ( savedPrimaryColor ) {
 			setCustomPrimaryColor( savedPrimaryColor );
 		}
 	}, [ savedPrimaryColor ] );
-	
+
 	/**
 	 * Generate colors when custom is selected.
 	 * This runs when switching to custom mode, ensuring we always show generated colors.
@@ -131,7 +141,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 			const scheme = generateColorScheme( customPrimaryColor, themeName );
 			setGeneratedColors( scheme.colors );
 			setContrastWarnings( scheme.warnings );
-			
+
 			// Notify parent component of generated colors and primary color
 			if ( onCustomColors ) {
 				onCustomColors( scheme.colors );
@@ -161,12 +171,13 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 					) }
 				</div>
 			) }
-			
+
 			<div className="atss-colors-control__grid">
 				{ colorSchemes.map( ( scheme ) => {
 					const colors = getFirstThreeColors( scheme );
 					const isSelected = value === scheme.id;
-					
+					const botigaStyle = isBotiga ? { backgroundColor: scheme?.colors['--bt-color-bg'] } : {};
+
 					return (
 						<button
 							key={ scheme.id }
@@ -175,6 +186,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 							onClick={ () => handleSelect( scheme.id ) }
 							aria-label={ scheme.name }
 							aria-pressed={ isSelected }
+							style={ botigaStyle }
 						>
 							<div className="atss-colors-control__circles">
 								{ colors.map( ( color, index ) => (
@@ -188,7 +200,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 						</button>
 					);
 				} ) }
-				
+
 				{/* Custom color option - placeholder for future implementation */}
 				<button
 					type="button"
@@ -204,7 +216,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 					</div>
 				</button>
 			</div>
-			
+
 			{/* Custom color picker panel */}
 			{ value === 'custom' && (
 				<div className="atss-colors-control__custom-panel">
@@ -253,7 +265,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 							</div>
 						</div>
 					</div>
-					
+
 					{/* Contrast warnings */}
 					{ contrastWarnings.length > 0 && (
 						<div className="atss-colors-control__warnings">
@@ -264,7 +276,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 							) ) }
 						</div>
 					) }
-					
+
 					{/* Generated color swatches */}
 					{ Object.keys( generatedColors ).length > 0 && (
 						<div className="atss-colors-control__swatches">
@@ -280,7 +292,7 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 							</div>
 						</div>
 					) }
-					
+
 					{/* Helper text */}
 					<p className="atss-colors-control__helper-text">
 						{ __( 'You can adjust the color palette later from the Customizer.', 'athemes-starter-sites' ) }
@@ -292,4 +304,3 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 }
 
 export default CustomColorsControl;
-

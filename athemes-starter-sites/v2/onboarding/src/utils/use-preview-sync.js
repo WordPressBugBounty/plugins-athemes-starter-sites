@@ -139,10 +139,11 @@ export const useLogoHeightPreviewSync = ( logoHeight ) => {
 /**
  * Hook to sync site title with the preview iframe.
  *
- * @param {string}  siteTitle    The site title.
+ * @param {string}  siteTitle     The site title.
  * @param {boolean} showSiteTitle Whether to show the title.
+ * @param {Object}  siteLogo      Logo data object with url and id.
  */
-export const useSiteTitlePreviewSync = ( siteTitle, showSiteTitle ) => {
+export const useSiteTitlePreviewSync = ( siteTitle, showSiteTitle, siteLogo ) => {
 	const timeoutRef = useRef( null );
 
 	useEffect( () => {
@@ -154,7 +155,7 @@ export const useSiteTitlePreviewSync = ( siteTitle, showSiteTitle ) => {
 
 		// Debounce the title update
 		timeoutRef.current = setTimeout( () => {
-			previewBridge.updateSiteTitle( siteTitle, showSiteTitle );
+			previewBridge.updateSiteTitle( siteTitle, showSiteTitle, siteLogo );
 		}, 500 );
 
 		// Cleanup
@@ -163,7 +164,7 @@ export const useSiteTitlePreviewSync = ( siteTitle, showSiteTitle ) => {
 				clearTimeout( timeoutRef.current );
 			}
 		};
-	}, [ siteTitle, showSiteTitle ]);
+	}, [ siteTitle, showSiteTitle, siteLogo ] );
 };
 
 /**
@@ -209,4 +210,3 @@ export const usePreviewBridgeInit = ( iframeRef ) => {
 		}
 	});
 };
-

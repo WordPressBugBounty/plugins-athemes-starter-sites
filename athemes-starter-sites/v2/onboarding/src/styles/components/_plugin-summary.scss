@@ -52,5 +52,9 @@
 		font-size: 12px;
 		font-weight: 400;
 		color: var(--atss-color-text-title, #101517);
+
+		.atss-onboarding-wizard--theme-botiga {
+			color: var(--atss-color-text-heading)
+		}
 	}
 }

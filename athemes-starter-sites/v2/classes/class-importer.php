@@ -374,7 +374,7 @@ class Athemes_Starter_Sites_Importer {
 	}
 
 	/**
-	 * Clean widget settings. 
+	 * Clean widget settings.
 	 */
 	public function clean_widget_settings() {
 
@@ -414,7 +414,7 @@ class Athemes_Starter_Sites_Importer {
 	}
 
 	/**
-	 * Clean customizer settings. 
+	 * Clean customizer settings.
 	 */
 	public function clean_customizer_settings() {
 
@@ -466,16 +466,17 @@ class Athemes_Starter_Sites_Importer {
 		$slug    = ( isset( $_POST['slug'] ) ) ? sanitize_text_field( wp_unslash( $_POST['slug'] ) ) : '';
 		$path    = ( isset( $_POST['path'] ) ) ? sanitize_text_field( wp_unslash( $_POST['path'] ) ) : '';
 
-		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
-		}
-
 		if ( empty( $slug ) ) {
 			wp_send_json_error( esc_html__( 'Unknown slug in a plugin.', 'athemes-starter-sites' ) );
 		}
 
 		if ( empty( $path ) ) {
 			wp_send_json_error( esc_html__( 'Unknown path in a plugin.', 'athemes-starter-sites' ) );
+		}
+
+		// Require a valid demo only when a demo-based import is being used.
+		if ( ! empty( $demo_id ) && ! isset( $this->demos[ $demo_id ] ) ) {
+			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'install_plugins' ) ) {
@@ -650,7 +651,7 @@ class Athemes_Starter_Sites_Importer {
 			add_filter( 'wxr_importer.pre_process.term', array( $this, 'woocommerce_product_attributes_registration' ) );
 			add_filter( 'add_term_metadata', array( $this, 'woocommerce_product_attributes_filter' ), 10, 5 );
 		}
-		
+
 
 		// Set the WordPress Importer v2 as the importer used in this plugin.
 		// More: https://github.com/humanmade/WordPress-Importer.
@@ -727,7 +728,7 @@ class Athemes_Starter_Sites_Importer {
 		// This prevents infinite split loops and ensures we only split when actually needed
 		$split_after_attachments = apply_filters( 'atss_split_after_attachments', 10 ); // Increased from 10 to 20
 		$should_split_by_count = false;
-		
+
 		if ( $this->importer && method_exists( $this->importer, 'get_attachment_count' ) ) {
 			$attachment_count = $this->importer->get_attachment_count();
 			// Only split if we've processed enough attachments AND some time has passed (at least 15 seconds)
@@ -783,7 +784,7 @@ class Athemes_Starter_Sites_Importer {
 		preg_match_all( '/(?:http(?:s?):)(?:[\/\\\\\\\\|.|\w|\s|-])*\.(?:jpg|jpeg|jpe|png|gif|webp|svg)/m', $content, $image_urls );
 
 		if ( ! empty( $image_urls[0] ) ) {
-			
+
 			$image_urls = array_unique( $image_urls[0] );
 
 			foreach ( $image_urls as $image_url ) {
@@ -1085,7 +1086,7 @@ class Athemes_Starter_Sites_Importer {
 		 * Process widgets.json.
 		 */
 		// Get JSON data from widgets.json with timeout protection.
-		$raw = wp_remote_get( 
+		$raw = wp_remote_get(
 			wp_unslash( $file_url ),
 			array(
 				'timeout' => 15, // Short timeout to prevent hanging
@@ -1198,7 +1199,7 @@ class Athemes_Starter_Sites_Importer {
 
 		} catch ( Exception $e ) {
 			// Log the error but don't crash the import - treat widget import as optional
-			error_log( 
+			error_log(
 				sprintf(
 					'ATSS Widget Import Exception: %1$s in %2$s on line %3$s',
 					$e->getMessage(),
@@ -1252,7 +1253,7 @@ class Athemes_Starter_Sites_Importer {
 		}
 
 		// Get JSON data from customizer.json with extended timeout.
-		$raw = wp_remote_get( 
+		$raw = wp_remote_get(
 			wp_unslash( $file_url ),
 			array(
 				'timeout' => 30, // Extended timeout for larger customizer files
@@ -1262,7 +1263,7 @@ class Athemes_Starter_Sites_Importer {
 
 		// Check if fetch failed.
 		if ( is_wp_error( $raw ) ) {
-			wp_send_json_error( 
+			wp_send_json_error(
 				sprintf(
 					esc_html__( 'Failed to fetch customizer file: %s', 'athemes-starter-sites' ),
 					$raw->get_error_message()
@@ -1272,7 +1273,7 @@ class Athemes_Starter_Sites_Importer {
 
 		// Abort if customizer.json response code is not successful.
 		if ( 200 != wp_remote_retrieve_response_code( $raw ) ) {
-			wp_send_json_error( 
+			wp_send_json_error(
 				sprintf(
 					esc_html__( 'Failed to load customizer demo file. HTTP %d', 'athemes-starter-sites' ),
 					wp_remote_retrieve_response_code( $raw )
@@ -1304,7 +1305,7 @@ class Athemes_Starter_Sites_Importer {
 		$results = $customizer->import( $data );
 
 		if ( is_wp_error( $results ) ) {
-			wp_send_json_error( 
+			wp_send_json_error(
 				sprintf(
 					esc_html__( 'Customizer import error: %s', 'athemes-starter-sites' ),
 					$results->get_error_message()
@@ -1323,7 +1324,7 @@ class Athemes_Starter_Sites_Importer {
 		wp_send_json_success();
 
 		} catch ( Exception $e ) {
-			wp_send_json_error( 
+			wp_send_json_error(
 				sprintf(
 					esc_html__( 'Customizer Import Exception: %1$s in %2$s on line %3$s', 'athemes-starter-sites' ),
 					$e->getMessage(),

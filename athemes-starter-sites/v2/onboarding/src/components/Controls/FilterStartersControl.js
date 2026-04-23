@@ -6,6 +6,7 @@
 
 import { CustomSelectControl } from '@wordpress/components';
 import { __, sprintf, _n } from '@wordpress/i18n';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Filter Starters Control component.
@@ -29,6 +30,11 @@ function FilterStartersControl( {
 	typeOptions,
 	categoryOptions,
 } ) {
+
+	if ( isBotiga ) {
+		return;
+	}
+
 	/**
 	 * Get the results count text.
 	 *
@@ -38,7 +44,7 @@ function FilterStartersControl( {
 		if ( resultsCount === 0 ) {
 			return __( 'No results', 'athemes-starter-sites' );
 		}
-		
+
 		return sprintf(
 			// translators: %d is the number of results
 			_n( '%d result', '%d results', resultsCount, 'athemes-starter-sites' ),
@@ -72,4 +78,3 @@ function FilterStartersControl( {
 }
 
 export default FilterStartersControl;
-

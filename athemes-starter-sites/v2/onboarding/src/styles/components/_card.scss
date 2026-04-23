@@ -21,16 +21,18 @@
 		transform: translateY(-2px);
 	}
 
-	&:focus {
+	&:focus-visible {
 		outline: 2px solid var(--atss-color-border-focus);
-		outline-offset: 2px;
 	}
 
 	// Selected state
 	&--selected {
 		border-color: var(--atss-color-accent);
-		border-width: 2px;
-		box-shadow: 0 0 0 3px var(--atss-color-accent-light);
+		outline: 2px solid var(--atss-color-accent);
+
+		&:hover {
+			border-color: var(--atss-color-accent);
+		}
 	}
 }
 
@@ -103,11 +105,21 @@
 	&--free {
 		background-color: rgb(227, 252, 231);
 		color: rgb(0, 138, 32);
+
+		.atss-onboarding-wizard--theme-botiga & {
+			background-color: #009683;
+			color: var(--atss-color-background-white);
+		}
 	}
 
 	&--pro {
 		background-color: var(--atss-color-accent);
 		color: var(--atss-color-background-white);
+
+		.atss-onboarding-wizard--theme-botiga & {
+			background-color: #E4F5F2;
+			color: #009683;
+		}
 	}
 }
 
@@ -118,4 +130,3 @@
 	gap: var(--atss-spacing-xl);
 	width: 100%;
 }
-

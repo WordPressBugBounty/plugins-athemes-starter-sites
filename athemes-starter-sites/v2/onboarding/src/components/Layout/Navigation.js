@@ -10,6 +10,7 @@ import PropTypes from 'prop-types';
 import { getThemeLogo } from '../../utils/helpers';
 import CloseConfirmationModal from './CloseConfirmationModal';
 import { useWizard } from '../../context/WizardContext';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Navigation component displaying logo, steps, and close button.
@@ -29,11 +30,19 @@ function Navigation( {
 	onStepChange,
 	onClose,
 } ) {
-	// Get import completion status from context
-	const { isImportComplete } = useWizard();
+	const { isImportComplete, wizardData } = useWizard();
+	const designPassed = completedSteps.includes( 2 ) || currentStep > 2;
+	const hasStarter = !! wizardData?.design?.selectedSiteId;
+	const hideStarterSteps = designPassed && ! hasStarter;
 
 	// State for close confirmation modal
 	const [ isCloseModalOpen, setIsCloseModalOpen ] = useState( false );
+
+	const themeText = {
+		wizardTitle: isBotiga
+			? __( 'Botiga Setup', 'athemes-starter-sites' )
+			: __( 'Site Wizard', 'athemes-starter-sites' ),
+	};
 
 	/**
 	 * Check if a step is accessible for navigation.
@@ -88,18 +97,23 @@ function Navigation( {
 					/>
 				) }
 				<span className="atss-onboarding-wizard__logo-title text-lg font-medium">
-					{ __( 'Site Wizard', 'athemes-starter-sites' ) }
+					{ themeText.wizardTitle }
 				</span>
 			</div>
 
 			{/* Steps */}
 			<div className="atss-onboarding-wizard__steps flex items-center gap-xs">
-				{ steps.filter( ( step ) => ! step.hidden ).map( ( step ) => {
+				{ steps.filter( ( step ) => {
+					if ( step.hidden ) return false;
+					if ( step.requiresStarter && hideStarterSteps ) return false;
+					return true;
+				} ).map( ( step, index ) => {
 					const isCompleted = completedSteps.includes( step.id );
 					const isActive = currentStep === step.id;
 					const isAccessible = isStepAccessible( step.id );
 					// Only show checkmark if completed AND we're past this step.
 					const showCheckmark = isCompleted && currentStep > step.id;
+					const displayNumber = index + 1;
 
 					return (
 						<button
@@ -137,7 +151,7 @@ function Navigation( {
 										</svg>
 									</span>
 								) : (
-									step.id
+									displayNumber
 								) }
 							</span>
 							<span className="atss-onboarding-wizard__step-label text-xs font-semibold">

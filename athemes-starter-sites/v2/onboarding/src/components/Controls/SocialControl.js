@@ -7,6 +7,7 @@
 import { __ } from '@wordpress/i18n';
 import { TextControl } from '@wordpress/components';
 import CustomSelectControlWithPlaceholder from './CustomSelectControlWithPlaceholder';
+import isBotiga from '../../utils/is-botiga';
 
 /**
  * Social platforms configuration.
@@ -87,6 +88,12 @@ function SocialControl( { label, value = [], onChange } ) {
 		} );
 	};
 
+	const themeText = {
+		socialButton: isBotiga
+			? __( 'Add', 'athemes-starter-sites' )
+			: __( 'Add social link', 'athemes-starter-sites' ),
+	};
+
 	return (
 		<div className="atss-social-control">
 			{ label && (
@@ -136,7 +143,7 @@ function SocialControl( { label, value = [], onChange } ) {
 				className="atss-onboarding-wizard__btn atss-onboarding-wizard__btn--skip"
 				onClick={ addSocialLink }
 			>
-				{ __( 'Add social link', 'athemes-starter-sites' ) }
+				{ themeText.socialButton }
 			</button>
 		</div>
 	);

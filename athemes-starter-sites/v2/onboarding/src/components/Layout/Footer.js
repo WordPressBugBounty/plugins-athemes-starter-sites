@@ -104,7 +104,7 @@ function Footer( {
 								<>
 									<span style={ { opacity: 0 } }>{ continueError ? __( 'Retry', 'athemes-starter-sites' ) : continueText }</span>
 									<span className="atss-onboarding-wizard__btn-spinner">
-										<Spinner />
+										<Spinner fill="#FFF" />
 									</span>
 								</>
 							) : (
