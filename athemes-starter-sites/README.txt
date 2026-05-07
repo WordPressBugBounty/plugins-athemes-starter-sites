@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 6.8.3
 Requires PHP: 5.4
-Stable tag: 1.1.8
+Stable tag: 1.1.9
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,16 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+
+= 1.1.9 =
+* Changed - Updated the Botiga onboarding v2 flow with follow-up improvements for the Pages, Features, and Import steps.
+* Fixed - WPForms Lite pre-selection now follows the Contact page selection during the initial recommendation flow, while still respecting manual user changes afterward.
+* Fixed - Improved WooCommerce utility page previews in the Pages step so Cart, Checkout, and My Account load correctly inside the onboarding iframe.
+* Fixed - Added seeded Cart and Checkout preview support during onboarding, making the preview flow closer to a real store setup.
+* Fixed - Improved the My Account onboarding preview by allowing it to load correctly inside the iframe.
+* Fixed - Polished several onboarding UI details, including welcome icon alignment, reset/font tooltips, My Account preview labeling, loading screen behavior, and completion page button handling.
+* Removed - Drip client-side script from the onboarding wizard.
+* Added - Lindris email opt-in support through the WordPress proxy endpoint, keeping API credentials server-side and updating the import flow tests for the new subscription behavior.
 
 = 1.1.8 =
 * Onboarding wizard support for Botiga

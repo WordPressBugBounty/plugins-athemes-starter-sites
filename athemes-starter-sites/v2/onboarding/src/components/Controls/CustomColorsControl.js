@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { ColorPicker, Popover, Icon } from '@wordpress/components';
+import { ColorPicker, Popover, Tooltip, Icon } from '@wordpress/components';
 import { rotateLeft } from '@wordpress/icons';
 import { generateColorScheme } from '../../utils/color-utils';
 import previewBridge from '../../utils/preview-bridge';
@@ -160,14 +160,16 @@ function CustomColorsControl( { label, colorSchemes = [], value, onChange, onCus
 						{ label }
 					</label>
 					{ value && (
-						<button
-							type="button"
-							className="atss-control__reset-button"
-							onClick={ handleReset }
-							aria-label={ __( 'Reset selection', 'athemes-starter-sites' ) }
-						>
-							<Icon icon={ rotateLeft } />
-						</button>
+						<Tooltip placement="top" text={ __( 'Reset to default', 'athemes-starter-sites' ) }>
+							<button
+								type="button"
+								className="atss-control__reset-button"
+								onClick={ handleReset }
+								aria-label={ __( 'Reset selection', 'athemes-starter-sites' ) }
+							>
+								<Icon icon={ rotateLeft } />
+							</button>
+						</Tooltip>
 					) }
 				</div>
 			) }

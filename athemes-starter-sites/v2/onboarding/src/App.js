@@ -63,6 +63,8 @@ function App() {
 	const [ showResumeModal, setShowResumeModal ] = useState( false );
 	const hasCheckedResume = useRef( false );
 
+	const [ isImporting, setIsImporting ] = useState( false );
+
 	/**
 	 * Show resume modal if user has saved progress (only on initial load).
 	 */
@@ -190,6 +192,7 @@ function App() {
 				onContinue={ handleContinue }
 				navigationLoading={ navigationState.isLoading }
 				navigationError={ navigationState.error }
+				onImportingChange={ setIsImporting }
 			/>
 		);
 	};
@@ -217,6 +220,7 @@ function App() {
 					completedSteps={ completedSteps }
 					onStepChange={ handleStepChange }
 					onClose={ handleClose }
+					isImporting={ isImporting }
 				/>
 
 				<main key={ currentStep } className="atss-onboarding-wizard__content">

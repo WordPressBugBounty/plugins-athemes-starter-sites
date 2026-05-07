@@ -248,7 +248,7 @@ function Complete() {
 											<a
 												href={ action.href }
 												className={ `atss-complete__action-link${ action.isPrimary ? '' : ' atss-complete__action-link--outline' }` }
-												target={ action.isExternal ? '_blank' : '_self' }
+												target="_blank"
 												rel={ action.isExternal ? 'noreferrer' : undefined }
 											>
 												{ action.label }

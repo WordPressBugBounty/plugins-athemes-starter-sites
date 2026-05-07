@@ -148,19 +148,44 @@ const ensureBotigaBuilderAddonPlugin = ( plugins, selectedBuilder ) => {
 /**
  * Get initial selected plugins.
  *
- * @param {Array} plugins Plugin list.
+ * @param {Array}   plugins         Plugin list.
+ * @param {boolean} contactSelected Whether the Contact page is selected.
  * @return {Array} Initial selected plugin slugs.
  */
-const getInitialSelection = ( plugins ) => {
+const getInitialSelection = ( plugins, contactSelected = false ) => {
 	return plugins
 		.filter( ( plugin ) => {
-			if ( plugin.required === true || plugin.isSelected === true ) {
+			const info = pluginInfo[ plugin.slug ] || {};
+
+			if ( plugin.slug === 'wpforms-lite' ) {
+				return contactSelected;
+			}
+
+			if (
+				plugin.required === true ||
+				plugin.isSelected === true ||
+				info.isSelected === true
+			) {
 				return true;
 			}
 
-			return pluginInfo[ plugin.slug ]?.default === true;
+			return plugin.default === true || info.default === true;
 		} )
 		.map( ( plugin ) => plugin.slug );
+};
+
+/**
+ * Check if the selected pages include a contact page.
+ *
+ * @param {Array} pages Selected page data.
+ * @return {boolean} Whether a contact page is selected.
+ */
+const hasSelectedContactPage = ( pages = [] ) => {
+	return pages.some( ( page ) => {
+		const slug = page.slug?.trim().toLowerCase() || '';
+
+		return /\bcontact\b/.test( slug );
+	} );
 };
 
 /**
@@ -200,6 +225,10 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 		const savedSelection = wizardData?.features?.selectedPlugins;
 		let availablePlugins = [];
 
+		const contactSelected = hasSelectedContactPage(
+			wizardData?.pages?.selectedPageData
+		);
+
 		if ( isBotiga ) {
 			const demo = selectedSiteId && window.atssOnboarding?.demos
 				? window.atssOnboarding.demos[ selectedSiteId ]
@@ -218,13 +247,19 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 
 			setPlugins( availablePlugins );
 
-			const initialSelection = getInitialSelection( availablePlugins );
+			const initialSelection = getInitialSelection(
+				availablePlugins,
+				contactSelected
+			);
+
+			const baseSelection = hasBuilderChanged
+				? initialSelection
+				: savedSelection || initialSelection;
+
+			setSelectedPlugins( baseSelection );
 
 			if ( hasBuilderChanged ) {
-				setSelectedPlugins( initialSelection );
 				setPreviousBuilder( selectedBuilder );
-			} else {
-				setSelectedPlugins( savedSelection || initialSelection );
 			}
 
 			setLoading( false );
@@ -240,7 +275,7 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 
 				setPlugins( availablePlugins );
 
-				const initialSelection = getInitialSelection( availablePlugins );
+				const initialSelection = getInitialSelection( availablePlugins, contactSelected );
 
 				if ( hasBuilderChanged ) {
 					setSelectedPlugins( initialSelection );
@@ -258,7 +293,7 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 
 		setPlugins( availablePlugins );
 
-		const initialSelection = getInitialSelection( availablePlugins );
+		const initialSelection = getInitialSelection( availablePlugins, contactSelected );
 
 		if ( hasBuilderChanged ) {
 			setSelectedPlugins( initialSelection );
@@ -268,7 +303,13 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 		}
 
 		setLoading( false );
-	}, [ selectedSiteId, selectedBuilder, hasBuilderChanged, wizardData?.features?.selectedPlugins ] );
+	}, [
+		selectedSiteId,
+		selectedBuilder,
+		hasBuilderChanged,
+		wizardData?.features?.selectedPlugins,
+		wizardData?.pages?.selectedPageData,
+	] );
 
 	/**
 	 * Handle plugin selection toggle.

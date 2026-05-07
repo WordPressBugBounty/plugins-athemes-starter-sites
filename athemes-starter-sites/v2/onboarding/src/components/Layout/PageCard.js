@@ -8,6 +8,7 @@ import { useState, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Icon } from '@wordpress/components';
 import { search } from '@wordpress/icons';
+import { removeQueryArgs } from '@wordpress/url';
 import { Spinner } from './index';
 
 /**
@@ -33,16 +34,13 @@ function PageCard( { id, title, url, thumbnail, isSelected = false, onToggle, on
 			return url;
 		}
 
-		let processedUrl = url;
 		const normalizedTitle = title?.toLowerCase().trim();
-		if ( normalizedTitle === 'my front page' || normalizedTitle === 'home' ) {
-			processedUrl = url.replace( /\?page_id=\d+/, '' );
+
+		if ( normalizedTitle !== 'my front page' && normalizedTitle !== 'home' ) {
+			return url;
 		}
 
-		// Add atss_preview=1 parameter
-		processedUrl = `${ processedUrl }${ processedUrl.includes( '?' ) ? '&' : '?' }atss_preview=1`;
-
-		return processedUrl;
+		return removeQueryArgs( url, 'page_id' );
 	}, [ url, title ] );
 
 	// Handle iframe load

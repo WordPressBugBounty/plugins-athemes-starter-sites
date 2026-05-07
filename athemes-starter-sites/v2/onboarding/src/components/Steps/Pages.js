@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
+import { addQueryArgs, removeQueryArgs } from '@wordpress/url';
 import { Footer, PageCard, Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
 import { getDemoPages } from '../../utils/api';
@@ -161,6 +162,7 @@ const getPreviewUrl = ( page, selectedSite, builder ) =>
 function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 	const { wizardData, prefetchedPages, siteTitle, builder } = useWizard();
 	const iframeRef = useRef( null );
+	const previewCacheToken = useRef( Date.now().toString() );
 	const [ pages, setPages ] = useState( [] );
 	const [ selectedPages, setSelectedPages ] = useState( [] );
 	const [ isLoading, setIsLoading ] = useState( false );
@@ -419,6 +421,9 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 	const handleContinue = () => {
 		onContinue( {
 			selectedPages,
+			selectedPageData: pages.filter( ( page ) =>
+				selectedPages.includes( page.id )
+			),
 		} );
 	};
 
@@ -460,6 +465,19 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 		customizeData.customColors,
 		colorSchemes,
 	] );
+
+	const addPreviewQueryArgs = ( url ) => {
+		if ( ! url ) {
+			return url;
+		}
+
+		const cleanUrl = removeQueryArgs( url, [ 'atss_preview', 'cache_test' ] );
+
+		return addQueryArgs( url, {
+			atss_preview: '1',
+			cache_test: previewCacheToken.current,
+		} );
+	};
 
 	return (
 		<div className="atss-onboarding-wizard__step-wrapper flex">
@@ -518,10 +536,8 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 										key={ page.id }
 										id={ page.id }
 										title={ page.title }
-										url={ getPreviewUrl(
-											page,
-											selectedSite,
-											builder
+										url={ addPreviewQueryArgs(
+											getPreviewUrl( page, selectedSite, builder )
 										) }
 										thumbnail={ page.thumbnail }
 										isSelected={ selectedPages.includes(
@@ -590,8 +606,7 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 									}
 
 									if ( isBotiga ) {
-										url = `${ url }${ url.includes( '?' ) ? '&' : '?' }atss_preview=1`;
-										return url;
+										return addPreviewQueryArgs( url );
 									}
 
 									// Transform:
@@ -614,9 +629,7 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 									}
 								}
 
-								url = `${ url }${ url.includes( '?' ) ? '&' : '?' }atss_preview=1`;
-
-								return url;
+								return addPreviewQueryArgs( url );
 							})() }
 							title={
 								currentPreviewPage.title ||

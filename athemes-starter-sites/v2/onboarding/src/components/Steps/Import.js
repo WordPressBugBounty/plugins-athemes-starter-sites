@@ -17,43 +17,43 @@ import { Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
 import { importAjaxRequest, deleteWizardState } from '../../utils/api';
 import Complete from '../Layout/Complete';
-import pluginInfo from '../../data/plugin-info';
 import isBotiga from '../../utils/is-botiga';
 
 /**
- * Send email to Drip if user opted in.
- * Mirrors the legacy behavior from v2/assets/js/src/script.js
+ * Send email opt-in subscriber to Lindris through aThemes proxy.
  *
  * @param {Object} wizardData The wizard state data.
+ * @return {Promise<void>}
  */
-const sendEmailToDrip = ( wizardData ) => {
+const sendEmailToLindris = async ( wizardData ) => {
 	const optinData = wizardData.optin || {};
 	const email = optinData.email;
 
-	// Only send if user provided email and opted in.
 	if ( ! email ) {
 		return;
 	}
 
-	// Ensure Drip is loaded (same account ID as legacy: 5598225).
-	if ( typeof window._dcq === 'undefined' ) {
-		window._dcq = window._dcq || [];
-		window._dcs = window._dcs || {};
-		window._dcs.account = 5598225;
+	const theme =
+		window.atssOnboarding?.themeName || 'Unknown';
 
-		const dc = document.createElement( 'script' );
-		dc.type = 'text/javascript';
-		dc.async = true;
-		dc.src = '//tag.getdrip.com/' + window._dcs.account + '.js';
-		document.head.appendChild( dc );
+	try {
+		await fetch(
+			'https://athemes.com/wp-json/wpf-api/v1/starter-sites/subscribe',
+			{
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify( {
+					email,
+					theme,
+				} ),
+			}
+		);
+	} catch ( error ) {
+		// eslint-disable-next-line no-console
+		console.warn( 'Lindris opt-in failed:', error );
 	}
-
-	// Send to Drip with theme name tag (e.g., "Sydney", "Botiga").
-	const themeName = window.atssOnboarding && window.atssOnboarding.themeName ? window.atssOnboarding.themeName : 'Unknown';
-	window._dcq.push( [ 'identify', {
-		email: email,
-		tags: [ themeName ],
-	} ] );
 };
 
 /**
@@ -215,9 +215,10 @@ const getImportSteps = ( wizardData, builder ) => {
  *
  * @param {Object}   props            Component props.
  * @param {Function} props.onContinue Callback when import is complete.
+ * @param {Function} props.onImportingChange Callback when import is started or stopped.
  * @return {JSX.Element} Import component.
  */
-function Import( { onContinue } ) {
+function Import( { onContinue, onImportingChange } ) {
 	const { wizardData, setIsImportComplete, builder } = useWizard();
 	const [ progress, setProgress ] = useState( 0 );
 	const [ status, setStatus ] = useState( __( 'Preparing import...', 'athemes-starter-sites' ) );
@@ -234,13 +235,16 @@ function Import( { onContinue } ) {
 	 * Execute the import steps sequentially.
 	 */
 	const executeImport = useCallback( async () => {
-		// Send email to Drip first (non-blocking).
-		sendEmailToDrip( wizardData );
+		onImportingChange?.( true );
+
+		// Send email to Lindris first (non-blocking).
+		sendEmailToLindris( wizardData );
 
 		const steps = getImportSteps( wizardData, selectedBuilder );
 
 		if ( steps.length === 0 ) {
 			setError( __( 'No import steps configured.', 'athemes-starter-sites' ) );
+			onImportingChange?.( false );
 			return;
 		}
 
@@ -312,6 +316,7 @@ function Import( { onContinue } ) {
 				}
 
 				setError( err.message || __( 'An error occurred during import.', 'athemes-starter-sites' ) );
+				onImportingChange?.( false );
 				return;
 			}
 		}
@@ -324,9 +329,10 @@ function Import( { onContinue } ) {
 		// Import complete.
 		setProgress( 100 );
 		setStatus( __( 'Import complete!', 'athemes-starter-sites' ) );
+		onImportingChange?.( false );
 		setIsComplete( true );
 		setIsImportComplete( true );
-	}, [ wizardData, demoId, selectedBuilder, setIsImportComplete ] );
+	}, [ wizardData, demoId, selectedBuilder, setIsImportComplete, onImportingChange ] );
 
 	// Start import on component mount.
 	useEffect( () => {
@@ -358,6 +364,7 @@ function Import( { onContinue } ) {
 								type="button"
 								className="atss-button atss-button--primary"
 								onClick={ () => {
+									onImportingChange?.( false );
 									setError( null );
 									setImportStarted( false );
 									setProgress( 0 );

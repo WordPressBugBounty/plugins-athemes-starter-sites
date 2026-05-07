@@ -29,6 +29,7 @@ function Navigation( {
 	completedSteps = [],
 	onStepChange,
 	onClose,
+	isImporting = false,
 } ) {
 	const { isImportComplete, wizardData } = useWizard();
 	const designPassed = completedSteps.includes( 2 ) || currentStep > 2;
@@ -175,6 +176,7 @@ function Navigation( {
 					}
 				} }
 				aria-label={ __( 'Close wizard', 'athemes-starter-sites' ) }
+				style={ { visibility: isImporting ? 'hidden' : 'visible' } }
 			>
 				<span className="atss-onboarding-wizard__close-icon" aria-hidden="true">
 					×
@@ -210,10 +212,12 @@ Navigation.propTypes = {
 	completedSteps: PropTypes.arrayOf( PropTypes.number ),
 	onStepChange: PropTypes.func.isRequired,
 	onClose: PropTypes.func.isRequired,
+	isImporting: PropTypes.bool,
 };
 
 Navigation.defaultProps = {
 	completedSteps: [],
+	isImporting: false,
 };
 
 export default Navigation;
