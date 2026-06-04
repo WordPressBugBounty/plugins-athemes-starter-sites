@@ -18,6 +18,7 @@ import { useWizard } from '../../context/WizardContext';
 import { importAjaxRequest, deleteWizardState } from '../../utils/api';
 import Complete from '../Layout/Complete';
 import isBotiga from '../../utils/is-botiga';
+import { trackOnboardingEvent, resetOnboardingMetricsSession } from '../../utils/metrics';
 
 /**
  * Send email opt-in subscriber to Lindris through aThemes proxy.
@@ -63,8 +64,9 @@ const sendEmailToLindris = async ( wizardData ) => {
 const FALLBACK_PLUGIN_PATHS = {
 	woocommerce: { path: 'woocommerce/woocommerce.php', name: 'WooCommerce' },
 	'wpforms-lite': { path: 'wpforms-lite/wpforms.php', name: 'WPForms Lite' },
-	'wp-mail-smtp': { path: 'wp-mail-smtp/wp_mail_smtp.php', name: 'WP Mail SMTP' },
 	'all-in-one-seo-pack': { path: 'all-in-one-seo-pack/all_in_one_seo_pack.php', name: 'All in One SEO' },
+	'wpconsent-cookies-banner-privacy-suite': { path: 'wpconsent-cookies-banner-privacy-suite/wpconsent.php', name: 'WPConsent' },
+	duplicator: { path: 'duplicator/duplicator.php', name: 'Duplicator' },
 	'sugar-calendar-lite': { path: 'sugar-calendar-lite/sugar-calendar-lite.php', name: 'Sugar Calendar Lite' },
 	merchant: { path: 'merchant/merchant.php', name: 'Merchant' },
 };
@@ -130,6 +132,16 @@ const getImportSteps = ( wizardData, builder ) => {
 					slug: 'athemes-addons-for-elementor-lite',
 					path: 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
 					name: 'aThemes Addons',
+				},
+				'wpconsent-cookies-banner-privacy-suite': {
+					slug: 'wpconsent-cookies-banner-privacy-suite',
+					path: 'wpconsent-cookies-banner-privacy-suite/wpconsent.php',
+					name: 'WPConsent',
+				},
+				duplicator: {
+					slug: 'duplicator',
+					path: 'duplicator/duplicator.php',
+					name: 'Duplicator',
 				},
 			};
 
@@ -232,6 +244,31 @@ function Import( { onContinue, onImportingChange } ) {
 	const selectedBuilder = builder || 'gutenberg';
 
 	/**
+	 * Get safe import metrics metadata.
+	 *
+	 * @param {Object} extraMetadata Extra metadata.
+	 * @return {Object} Import metrics metadata.
+	 */
+	const getImportMetricsMetadata = ( extraMetadata = {} ) => {
+		const pages = wizardData.pages || {};
+		const features = wizardData.features || {};
+		const optin = wizardData.optin || {};
+		const selectedPages = pages.selectedPages || [];
+		const selectedPlugins = features.selectedPlugins || [];
+
+		return {
+			builder: selectedBuilder,
+			step: 'import',
+			demo_id: demoId,
+			has_selected_starter: !! demoId,
+			selected_pages_count: selectedPages.length,
+			selected_plugins_count: selectedPlugins.length,
+			optin_checked: !! optin.optinChecked,
+			...extraMetadata,
+		};
+	};
+
+	/**
 	 * Execute the import steps sequentially.
 	 */
 	const executeImport = useCallback( async () => {
@@ -242,7 +279,20 @@ function Import( { onContinue, onImportingChange } ) {
 
 		const steps = getImportSteps( wizardData, selectedBuilder );
 
+		trackOnboardingEvent(
+			'onboarding_import_started',
+			getImportMetricsMetadata()
+		);
+
 		if ( steps.length === 0 ) {
+			trackOnboardingEvent(
+				'onboarding_import_failed',
+				getImportMetricsMetadata( {
+					import_step: '',
+					error_code: 'no_import_steps_configured',
+				} )
+			);
+
 			setError( __( 'No import steps configured.', 'athemes-starter-sites' ) );
 			onImportingChange?.( false );
 			return;
@@ -269,6 +319,14 @@ function Import( { onContinue, onImportingChange } ) {
 				if ( response && response.success === false ) {
 					// For widget and customizer imports, log but don't block.
 					if ( step.action === 'atss_import_widgets' || step.action === 'atss_import_customizer' ) {
+						trackOnboardingEvent(
+							'onboarding_import_failed',
+							getImportMetricsMetadata( {
+								import_step: step.action,
+								error_code: 'non_critical_import_step_failed',
+							} )
+						);
+
 						// eslint-disable-next-line no-console
 						console.warn( 'Non-critical import step failed:', step.action, response.data );
 						currentStep++;
@@ -277,6 +335,14 @@ function Import( { onContinue, onImportingChange } ) {
 
 					// For plugin installs, log but continue.
 					if ( step.action === 'atss_import_plugin' ) {
+						trackOnboardingEvent(
+							'onboarding_import_failed',
+							getImportMetricsMetadata( {
+								import_step: step.action,
+								error_code: 'plugin_installation_failed',
+							} )
+						);
+
 						// eslint-disable-next-line no-console
 						console.warn( 'Plugin installation failed:', step.slug, response.data );
 						currentStep++;
@@ -292,6 +358,13 @@ function Import( { onContinue, onImportingChange } ) {
 					// Don't increment step, retry the same step.
 					continue;
 				}
+
+				trackOnboardingEvent(
+					'onboarding_import_step_completed',
+					getImportMetricsMetadata( {
+						import_step: step.action,
+					} )
+				);
 
 				// Move to next step.
 				currentStep++;
@@ -315,6 +388,14 @@ function Import( { onContinue, onImportingChange } ) {
 					continue;
 				}
 
+				trackOnboardingEvent(
+					'onboarding_import_failed',
+					getImportMetricsMetadata( {
+						import_step: step.action,
+						error_code: err.name || 'import_step_failed',
+					} )
+				);
+
 				setError( err.message || __( 'An error occurred during import.', 'athemes-starter-sites' ) );
 				onImportingChange?.( false );
 				return;
@@ -327,6 +408,13 @@ function Import( { onContinue, onImportingChange } ) {
 		}
 
 		// Import complete.
+		trackOnboardingEvent(
+			'onboarding_import_completed',
+			getImportMetricsMetadata()
+		);
+
+		resetOnboardingMetricsSession();
+
 		setProgress( 100 );
 		setStatus( __( 'Import complete!', 'athemes-starter-sites' ) );
 		onImportingChange?.( false );

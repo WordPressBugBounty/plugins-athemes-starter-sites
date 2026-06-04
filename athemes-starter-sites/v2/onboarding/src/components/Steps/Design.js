@@ -13,6 +13,7 @@ import SearchStartersControl from '../Controls/SearchStartersControl';
 import FilterStartersControl from '../Controls/FilterStartersControl';
 import starterCategories from '../../data/starter-categories';
 import { useWizard } from '../../context/WizardContext';
+import { trackOnboardingEvent } from '../../utils/metrics';
 
 /**
  * Design step component.
@@ -171,6 +172,14 @@ function Design( { onBack, onContinue, onSkip, navigationLoading, navigationErro
 									onSelect={ ( siteId ) => {
 										if ( siteId === selectedCardId ) {
 											setSelectedCardId( null );
+
+											trackOnboardingEvent( 'onboarding_design_selected', {
+												builder: selectedBuilder,
+												step: 'design',
+												demo_id: siteId,
+												has_selected_starter: true,
+											} );
+
 											onContinue( {
 												selectedSiteId: siteId,
 											} );
@@ -183,6 +192,14 @@ function Design( { onBack, onContinue, onSkip, navigationLoading, navigationErro
 											updateStepData( 'features', {} );
 										}
 										setSelectedCardId( siteId );
+
+										trackOnboardingEvent( 'onboarding_design_selected', {
+											builder: selectedBuilder,
+											step: 'design',
+											demo_id: siteId,
+											has_selected_starter: true,
+										} );
+
 										onContinue( {
 											selectedSiteId: siteId,
 										} );

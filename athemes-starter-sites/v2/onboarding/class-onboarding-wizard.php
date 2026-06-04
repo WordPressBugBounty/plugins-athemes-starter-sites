@@ -68,6 +68,13 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		private $customization_handler;
 
 		/**
+		 * Metrics handler.
+		 *
+		 * @var ATSS_Onboarding_Metrics
+		 */
+		private $metrics;
+
+		/**
 		 * Constructor.
 		 */
 		public function __construct() {
@@ -85,6 +92,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 				$this->page_slug,
 				array( $this, 'get_localized_data' )
 			);
+			$this->metrics               = new ATSS_Onboarding_Metrics();
 		}
 
 		/**
@@ -99,6 +107,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			require_once ATSS_PATH . 'v2/onboarding/includes/class-state-manager.php';
 			require_once ATSS_PATH . 'v2/onboarding/includes/class-page-filter.php';
 			require_once ATSS_PATH . 'v2/onboarding/includes/class-customization-handler.php';
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-metrics.php';
 		}
 
 		/**
@@ -142,6 +151,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 			// Initialize page filter when import starts (filters pages based on wizard selection).
 			add_action( 'atss_import_start', array( $this, 'init_page_filter' ) );
+
+			$this->metrics->init();
 		}
 
 		/**

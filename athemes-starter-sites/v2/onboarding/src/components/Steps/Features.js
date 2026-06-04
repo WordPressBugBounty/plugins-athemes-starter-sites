@@ -5,7 +5,7 @@
  */
 
 import { __ } from '@wordpress/i18n';
-import { useState, useEffect } from '@wordpress/element';
+import { useState, useEffect, useRef } from '@wordpress/element';
 import { useWizard } from '../../context/WizardContext';
 import { Footer } from '../Layout';
 import FeatureCard from '../Layout/FeatureCard';
@@ -13,6 +13,120 @@ import PluginSummary from '../Controls/PluginSummary';
 import pluginInfo from '../../data/plugin-info';
 import isBotiga from '../../utils/is-botiga';
 import getBotigaAvailablePlugins from '../../utils/get-botiga-available-plugins';
+import { trackOnboardingEvent } from '../../utils/metrics';
+
+/**
+ * Plugins that should always be shown in the onboarding Features step.
+ *
+ * These are injected at the onboarding layer so the change can apply across
+ * Sydney, Botiga, starter-specific flows, and no-starter fallback flows.
+ *
+ * @type {Array}
+ */
+const onboardingRecommendedPlugins = [
+	{
+		slug: 'all-in-one-seo-pack',
+		name: 'All in One SEO',
+		recommended: true,
+		isSelected: true,
+	},
+	{
+		slug: 'wpconsent-cookies-banner-privacy-suite',
+		name: 'WPConsent',
+		recommended: true,
+		isSelected: true,
+		description: __(
+			'Add privacy compliance tools and a cookie consent banner to your site.',
+			'athemes-starter-sites'
+		),
+	},
+	{
+		slug: 'duplicator',
+		name: 'Duplicator',
+		description: __(
+			'Create reliable website backups and migrate your site when needed.',
+			'athemes-starter-sites'
+		),
+	},
+];
+
+/**
+ * Demo-specific plugins that should be recommended when present in a starter.
+ *
+ * These plugins are not injected globally. They are only enhanced when the
+ * selected starter already includes them in its plugin configuration.
+ *
+ * @type {Object}
+ */
+const demoSpecificRecommendedPlugins = {
+	'dokan-lite': {
+		name: 'Dokan',
+		recommended: true,
+		isSelected: true,
+		description: __(
+			'Create a multi-vendor marketplace for your online store.',
+			'athemes-starter-sites'
+		),
+	},
+};
+
+/**
+ * Normalize plugins shown in the Features step.
+ *
+ * @param {Array} plugins Plugin list.
+ * @return {Array} Normalized plugin list.
+ */
+const normalizeFeaturePlugins = ( plugins ) => {
+	if ( ! Array.isArray( plugins ) ) {
+		return [];
+	}
+
+	const normalizedPlugins = plugins
+		.map( ( plugin ) => {
+			const recommendedPlugin =
+				onboardingRecommendedPlugins.find(
+					( item ) => item.slug === plugin.slug
+				) || demoSpecificRecommendedPlugins[ plugin.slug ];
+
+			if ( ! recommendedPlugin ) {
+				return plugin;
+			}
+
+			return {
+				...plugin,
+				...recommendedPlugin,
+			};
+		} );
+
+	const pluginSlugs = normalizedPlugins.map( ( plugin ) => plugin.slug );
+
+	return [
+		...normalizedPlugins,
+		...onboardingRecommendedPlugins.filter(
+			( plugin ) => ! pluginSlugs.includes( plugin.slug )
+		),
+	];
+};
+
+/**
+ * Sanitize saved plugin selections.
+ *
+ * @param {Array} selectedPlugins Selected plugin slugs.
+ * @param {Array} availablePlugins Available plugin list.
+ * @return {Array|null} Sanitized selected plugin slugs.
+ */
+const sanitizeSelectedPlugins = ( selectedPlugins, availablePlugins ) => {
+	if ( ! Array.isArray( selectedPlugins ) ) {
+		return null;
+	}
+
+	const availablePluginSlugs = availablePlugins.map( ( plugin ) => plugin.slug );
+
+	return selectedPlugins.filter(
+		( slug ) =>
+			availablePluginSlugs.includes( slug )
+	);
+};
 
 /**
  * Fallback plugins shown when no starter site is selected.
@@ -23,8 +137,9 @@ import getBotigaAvailablePlugins from '../../utils/get-botiga-available-plugins'
 const getFallbackPlugins = ( selectedBuilder ) => {
 	const fallbackPlugins = [
 		{ slug: 'wpforms-lite', name: 'WPForms Lite' },
-		{ slug: 'wp-mail-smtp', name: 'WP Mail SMTP' },
 		{ slug: 'all-in-one-seo-pack', name: 'All in One SEO' },
+		{ slug: 'wpconsent-cookies-banner-privacy-suite', name: 'WPConsent' },
+		{ slug: 'duplicator', name: 'Duplicator' },
 		{ slug: 'sugar-calendar-lite', name: 'Sugar Calendar Lite' },
 		{ slug: 'merchant', name: 'Merchant' },
 	];
@@ -201,25 +316,26 @@ const hasSelectedContactPage = ( pages = [] ) => {
  */
 function Features( { onBack, onSkip, onContinue, navigationLoading, navigationError } ) {
 	const { wizardData, builder } = useWizard();
-	const [plugins, setPlugins] = useState( [] );
-	const [selectedPlugins, setSelectedPlugins] = useState( [] );
-	const [loading, setLoading] = useState( true );
-	const [previousBuilder, setPreviousBuilder] = useState( builder );
+
+	// Get the currently selected demo from wizard context.
+	const selectedSiteId = wizardData?.design?.selectedSiteId;
+
+	// Get the selected builder from context.
+	const selectedBuilder = builder || 'gutenberg';
+
+	const [ plugins, setPlugins ] = useState( [] );
+	const [ selectedPlugins, setSelectedPlugins ] = useState( [] );
+	const [ loading, setLoading ] = useState( true );
+	const previousSelectionRef = useRef( {
+		selectedBuilder,
+		selectedSiteId,
+	} );
 
 	const themeText = {
 		wizardDescription: isBotiga
 			? __( 'We have selected some recommended tools and features to help take your site to the next level.', 'athemes-starter-sites' )
 			: __( 'We have selected some recommended plugins to help take your site to the next level.', 'athemes-starter-sites' ),
 	};
-
-	// Get the currently selected demo from wizard context.
-	const selectedSiteId = wizardData?.design?.selectedSiteId;
-
-	// Get the selected builder from context
-	const selectedBuilder = builder || 'gutenberg';
-
-	// Detect if builder has changed
-	const hasBuilderChanged = previousBuilder !== selectedBuilder;
 
 	useEffect( () => {
 		const savedSelection = wizardData?.features?.selectedPlugins;
@@ -228,6 +344,47 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 		const contactSelected = hasSelectedContactPage(
 			wizardData?.pages?.selectedPageData
 		);
+
+		const hasBuilderChanged =
+			previousSelectionRef.current.selectedBuilder !== selectedBuilder;
+		const hasSelectedSiteChanged =
+			previousSelectionRef.current.selectedSiteId !== selectedSiteId;
+		const shouldResetSelection = hasBuilderChanged || hasSelectedSiteChanged;
+
+		/**
+		 * Get the selected plugins for the current feature list.
+		 *
+		 * @param {Array} initialSelection Initial selected plugin slugs.
+		 * @return {Array} Selected plugin slugs.
+		 */
+		const getBaseSelection = ( initialSelection ) => {
+			if ( shouldResetSelection ) {
+				return initialSelection;
+			}
+
+			const savedPluginSelection = sanitizeSelectedPlugins(
+				savedSelection,
+				availablePlugins
+			);
+
+			return savedPluginSelection || initialSelection;
+		};
+
+		/**
+		 * Store the current builder and starter for later comparison.
+		 *
+		 * @return {void}
+		 */
+		const syncPreviousSelection = () => {
+			if ( ! shouldResetSelection ) {
+				return;
+			}
+
+			previousSelectionRef.current = {
+				selectedBuilder,
+				selectedSiteId,
+			};
+		};
 
 		if ( isBotiga ) {
 			const demo = selectedSiteId && window.atssOnboarding?.demos
@@ -239,11 +396,15 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 				selectedBuilder
 			);
 
-			availablePlugins = getBotigaAvailablePlugins( demoPlugins, selectedBuilder );
+			availablePlugins = getBotigaAvailablePlugins(
+				demoPlugins,
+				selectedBuilder
+			);
 			availablePlugins = ensureBotigaBuilderAddonPlugin(
 				availablePlugins,
 				selectedBuilder
 			);
+			availablePlugins = normalizeFeaturePlugins( availablePlugins );
 
 			setPlugins( availablePlugins );
 
@@ -252,16 +413,8 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 				contactSelected
 			);
 
-			const baseSelection = hasBuilderChanged
-				? initialSelection
-				: savedSelection || initialSelection;
-
-			setSelectedPlugins( baseSelection );
-
-			if ( hasBuilderChanged ) {
-				setPreviousBuilder( selectedBuilder );
-			}
-
+			setSelectedPlugins( getBaseSelection( initialSelection ) );
+			syncPreviousSelection();
 			setLoading( false );
 			return;
 		}
@@ -269,44 +422,52 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 		if ( selectedSiteId && window.atssOnboarding?.demos ) {
 			const demo = window.atssOnboarding.demos[ selectedSiteId ];
 
-			if ( demo && demo.plugins && Array.isArray( demo.plugins ) && demo.plugins.length > 0 ) {
-				availablePlugins = filterPluginsByBuilder( demo.plugins, selectedBuilder );
-				availablePlugins = ensureElementorPlugin( availablePlugins, selectedBuilder );
+			if (
+				demo &&
+				demo.plugins &&
+				Array.isArray( demo.plugins ) &&
+				demo.plugins.length > 0
+			) {
+				availablePlugins = filterPluginsByBuilder(
+					demo.plugins,
+					selectedBuilder
+				);
+				availablePlugins = ensureElementorPlugin(
+					availablePlugins,
+					selectedBuilder
+				);
+				availablePlugins = normalizeFeaturePlugins( availablePlugins );
 
 				setPlugins( availablePlugins );
 
-				const initialSelection = getInitialSelection( availablePlugins, contactSelected );
+				const initialSelection = getInitialSelection(
+					availablePlugins,
+					contactSelected
+				);
 
-				if ( hasBuilderChanged ) {
-					setSelectedPlugins( initialSelection );
-					setPreviousBuilder( selectedBuilder );
-				} else {
-					setSelectedPlugins( savedSelection || initialSelection );
-				}
-
+				setSelectedPlugins( getBaseSelection( initialSelection ) );
+				syncPreviousSelection();
 				setLoading( false );
 				return;
 			}
 		}
 
 		availablePlugins = getFallbackPlugins( selectedBuilder );
+		availablePlugins = normalizeFeaturePlugins( availablePlugins );
 
 		setPlugins( availablePlugins );
 
-		const initialSelection = getInitialSelection( availablePlugins, contactSelected );
+		const initialSelection = getInitialSelection(
+			availablePlugins,
+			contactSelected
+		);
 
-		if ( hasBuilderChanged ) {
-			setSelectedPlugins( initialSelection );
-			setPreviousBuilder( selectedBuilder );
-		} else {
-			setSelectedPlugins( savedSelection || initialSelection );
-		}
-
+		setSelectedPlugins( getBaseSelection( initialSelection ) );
+		syncPreviousSelection();
 		setLoading( false );
 	}, [
 		selectedSiteId,
 		selectedBuilder,
-		hasBuilderChanged,
 		wizardData?.features?.selectedPlugins,
 		wizardData?.pages?.selectedPageData,
 	] );
@@ -317,9 +478,9 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 	 * @param {string} pluginSlug The plugin slug to toggle.
 	 */
 	const handlePluginToggle = ( pluginSlug ) => {
-		setSelectedPlugins( prev => {
+		setSelectedPlugins( ( prev ) => {
 			if ( prev.includes( pluginSlug ) ) {
-				return prev.filter( slug => slug !== pluginSlug );
+				return prev.filter( ( slug ) => slug !== pluginSlug );
 			}
 			return [ ...prev, pluginSlug ];
 		} );
@@ -330,6 +491,14 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 	 * Saves selected plugins to wizard context and proceeds to Optin step.
 	 */
 	const handleContinue = () => {
+		trackOnboardingEvent( 'onboarding_features_selected', {
+			builder: selectedBuilder,
+			step: 'features',
+			demo_id: selectedSiteId || '',
+			has_selected_starter: !! selectedSiteId,
+			selected_plugins_count: selectedPlugins.length,
+		} );
+
 		onContinue( {
 			selectedPlugins,
 		} );
@@ -341,11 +510,20 @@ function Features( { onBack, onSkip, onContinue, navigationLoading, navigationEr
 	 */
 	const handleSkip = () => {
 		const requiredPlugins = plugins
-			.filter( plugin => plugin.required === true )
-			.map( plugin => plugin.slug );
+			.filter( ( plugin ) => plugin.required === true )
+			.map( ( plugin ) => plugin.slug );
+
+		trackOnboardingEvent( 'onboarding_features_selected', {
+			builder: selectedBuilder,
+			step: 'features',
+			demo_id: selectedSiteId || '',
+			has_selected_starter: !! selectedSiteId,
+			selected_plugins_count: requiredPlugins.length,
+		} );
+
 		onContinue( {
 			selectedPlugins: requiredPlugins,
-		} );
+		}, true );
 	};
 
 	if ( loading ) {

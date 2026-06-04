@@ -21,6 +21,7 @@ import {
 	buildBotigaNonVariableCss,
 	buildBotigaScopedVariableOverrideCss,
 } from '../../data/botiga-non-variable-color-rules';
+import { trackOnboardingEvent } from '../../utils/metrics';
 
 /**
  * Transform color scheme data to preview-compatible format.
@@ -419,6 +420,14 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 	 * Handle continue.
 	 */
 	const handleContinue = () => {
+		trackOnboardingEvent( 'onboarding_pages_selected', {
+			builder,
+			step: 'pages',
+			demo_id: selectedSiteId,
+			has_selected_starter: !! selectedSiteId,
+			selected_pages_count: selectedPages.length,
+		} );
+
 		onContinue( {
 			selectedPages,
 			selectedPageData: pages.filter( ( page ) =>

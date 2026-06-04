@@ -1,9 +1,9 @@
 === aThemes Starter Sites ===
 Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
-Tested up to: 6.8.3
+Tested up to: 7.0
 Requires PHP: 5.4
-Stable tag: 1.1.9
+Stable tag: 1.2.0
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,9 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+
+= 1.2.0 =
+* Changed - Updated the onboarding wizard recommended features to include SEO, privacy compliance, and backup recommendations.
 
 = 1.1.9 =
 * Changed - Updated the Botiga onboarding v2 flow with follow-up improvements for the Pages, Features, and Import steps.

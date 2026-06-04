@@ -16,6 +16,7 @@ import optinImageBotiga from '../../assets/images/optin-botiga.jpg';
 import handsIcon from '../../assets/images/hands.png';
 import heartGif from '../../assets/images/heart.gif';
 import isBotiga from '../../utils/is-botiga';
+import { trackOnboardingEvent } from '../../utils/metrics';
 
 /**
  * Optin step component.
@@ -84,6 +85,11 @@ function Optin( { onBack, onContinue } ) {
 	 * Handle continue button click.
 	 */
 	const handleContinue = () => {
+		trackOnboardingEvent( 'onboarding_optin_completed', {
+			step: 'optin',
+			optin_checked: !! optinChecked,
+		} );
+
 		onContinue( {
 			email,
 			optinChecked,
@@ -94,10 +100,15 @@ function Optin( { onBack, onContinue } ) {
 	 * Handle skip button click.
 	 */
 	const handleSkip = () => {
+		trackOnboardingEvent( 'onboarding_optin_completed', {
+			step: 'optin',
+			optin_checked: false,
+		} );
+
 		onContinue( {
 			email: '',
 			optinChecked: false,
-		} );
+		}, true );
 	};
 
 	const themeText = {

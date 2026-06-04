@@ -11,6 +11,12 @@ import ResumeModal from './components/Layout/ResumeModal';
 import wizardSteps from './data/wizard-steps';
 import { useWizard } from './context/WizardContext';
 import themeName from './utils/get-theme-name';
+import {
+	trackOnboardingEvent,
+	hasTrackedSessionEvent,
+	markSessionEventTracked,
+	resetOnboardingMetricsSession,
+} from './utils/metrics';
 
 /**
  * Main App component for the onboarding wizard.
@@ -27,6 +33,7 @@ function App() {
 		saveState,
 		resetWizard,
 		wizardData,
+		builder,
 	} = useWizard();
 
 	const hasStarter = !! wizardData?.design?.selectedSiteId;
@@ -65,6 +72,93 @@ function App() {
 
 	const [ isImporting, setIsImporting ] = useState( false );
 
+	const trackedViewedSteps = useRef( new Set() );
+
+	/**
+	 * Get the current step slug.
+	 *
+	 * @param {number} stepId Step ID.
+	 * @return {string} Step slug.
+	 */
+	const getStepSlug = ( stepId ) => {
+		const step = wizardSteps.find( ( item ) => item.id === stepId );
+
+		return step?.slug || '';
+	};
+
+	/**
+	 * Get safe metrics metadata for the current wizard state.
+	 *
+	 * @param {number} stepId Step ID.
+	 * @return {Object} Metrics metadata.
+	 */
+	const getMetricsMetadata = ( stepId = currentStep, stepData = null ) => {
+		const stepSlug = getStepSlug( stepId );
+		const data = {
+			...wizardData,
+			...( stepSlug && stepData
+				? {
+						[ stepSlug ]: stepData,
+				  }
+				: {} ),
+		};
+
+		const design = data?.design || {};
+		const pages = data?.pages || {};
+		const features = data?.features || {};
+		const optin = data?.optin || {};
+		const selectedPages = pages.selectedPages || [];
+		const selectedPlugins = features.selectedPlugins || [];
+		const demoId = design.selectedSiteId || '';
+
+		return {
+			builder: stepData?.builder || builder || 'gutenberg',
+			step: stepSlug,
+			demo_id: demoId,
+			has_selected_starter: !! demoId,
+			selected_pages_count: selectedPages.length,
+			selected_plugins_count: selectedPlugins.length,
+			optin_checked: !! optin.optinChecked,
+		};
+	};
+
+	/**
+	 * Get step data to save when skipping a step.
+	 *
+	 * @return {Object|null} Step data.
+	 */
+	const getSkipStepData = () => {
+		const stepSlug = getStepSlug( currentStep );
+
+		if ( stepSlug === 'design' ) {
+			return {
+				selectedSiteId: '',
+			};
+		}
+
+		if ( stepSlug === 'pages' ) {
+			return {
+				selectedPages: [],
+				selectedPageData: [],
+			};
+		}
+
+		if ( stepSlug === 'features' ) {
+			return {
+				selectedPlugins: [],
+			};
+		}
+
+		if ( stepSlug === 'optin' ) {
+			return {
+				email: '',
+				optinChecked: false,
+			};
+		}
+
+		return null;
+	};
+
 	/**
 	 * Show resume modal if user has saved progress (only on initial load).
 	 */
@@ -92,6 +186,27 @@ function App() {
 	}, [ isLoading, completedSteps.length ] );
 
 	/**
+	 * Track wizard started and step viewed events.
+	 */
+	useEffect( () => {
+		if ( isLoading ) {
+			return;
+		}
+
+		if ( ! hasTrackedSessionEvent( 'onboarding_started' ) ) {
+			trackOnboardingEvent( 'onboarding_started', getMetricsMetadata() );
+			markSessionEventTracked( 'onboarding_started' );
+		}
+
+		if ( trackedViewedSteps.current.has( currentStep ) ) {
+			return;
+		}
+
+		trackOnboardingEvent( 'onboarding_step_viewed', getMetricsMetadata() );
+		trackedViewedSteps.current.add( currentStep );
+	}, [ isLoading, currentStep ] );
+
+	/**
 	 * Handle resuming the wizard session.
 	 */
 	const handleResume = () => {
@@ -104,6 +219,7 @@ function App() {
 	const handleRestart = async () => {
 		const success = await resetWizard();
 		if ( success ) {
+			resetOnboardingMetricsSession();
 			setShowResumeModal( false );
 			hasCheckedResume.current = false;
 		}
@@ -123,7 +239,7 @@ function App() {
 	 *
 	 * @param {Object} stepData Optional data from the step to save.
 	 */
-	const handleContinue = async ( stepData = null ) => {
+	const handleContinue = async ( stepData = null, isSkipped = false ) => {
 		const pendingHasStarter =
 			currentStep === 2 ? !! stepData?.selectedSiteId : hasStarter;
 
@@ -135,6 +251,12 @@ function App() {
 
 		try {
 			await markStepCompleted( currentStep, isLastStep ? null : nextStep, stepData );
+
+			trackOnboardingEvent(
+				isSkipped ? 'onboarding_step_skipped' : 'onboarding_step_completed',
+				getMetricsMetadata( currentStep, stepData )
+			);
+
 			// Clear loading state on success
 			setNavigationState( { isLoading: false, error: null } );
 		} catch ( error ) {
@@ -161,7 +283,7 @@ function App() {
 	 * Handle skipping the current step.
 	 */
 	const handleSkip = () => {
-		handleContinue();
+		handleContinue( getSkipStepData(), true );
 	};
 
 	/**
