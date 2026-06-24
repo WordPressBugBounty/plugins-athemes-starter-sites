@@ -618,16 +618,16 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 										return addPreviewQueryArgs( url );
 									}
 
-									// Transform:
-									// https://demo.athemes.com/sydney-main/
-									// to
-									// https://demo.athemes.com/sydney-main-gb/
-									if ( ! /-gb\/?(\?.*)?$/.test( url ) ) {
-										url = url.replace(
-											/\/([^/\?]+)(\/)?(\?.*)?$/,
-											'/$1-gb$2$3'
-										);
-									}
+									// Append -gb to the site slug (first path segment) only —
+									// never to a page slug. Gutenberg page guids already
+									// include the -gb subsite, so this is a no-op for them.
+									// e.g. https://demo.athemes.com/sydney-main/about/
+									//   -> https://demo.athemes.com/sydney-main-gb/about/
+									url = url.replace(
+										/(\/\/[^/]+\/)([^/?]+)/,
+										( match, prefix, siteSlug ) =>
+											siteSlug.endsWith( '-gb' ) ? match : `${ prefix }${ siteSlug }-gb`
+									);
 
 									if ( selectedSiteId === 'cafe' ) {
 										url = 'https://demo.athemes.com/sp-cafe-gb/';

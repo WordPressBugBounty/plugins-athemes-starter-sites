@@ -171,7 +171,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor',
 					'gutenberg',
 				),
-				'preview'    => 'https://demo.athemes.com/walkathon/',
+				'preview'    => 'https://demo.athemes.com/sydney-walkathon/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/walkathon/thumb.jpg',
 				'plugins'    => array_merge(
 					array(
@@ -254,7 +254,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor',
 					'gutenberg',
 				),
-				'preview'    => 'https://demo.athemes.com/barbershop/',
+				'preview'    => 'https://demo.athemes.com/sydney-barbershop/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/barbershop/thumb.jpg',
 				'plugins'    => array_merge(
 					array(
@@ -296,7 +296,7 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					'elementor',
 					'gutenberg',
 				),
-				'preview'    => 'https://demo.athemes.com/pet-shop/',
+				'preview'    => 'https://demo.athemes.com/sp-pet-shop/',
 				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/pet-shop/thumb.jpg',
 				'plugins'    => array_merge(
 					array(
@@ -1057,8 +1057,12 @@ add_action( 'atss_import_start', 'sydney_atss_setup_before_import', 10, 2 );
  */
 function sydney_atss_setup_after_import( $demo_id ) {
 
-	// Assign the menu.
+	// Assign the menu. Prefer "Menu 1", fall back to "Main" if not found.
 	$main_menu = get_term_by( 'name', 'Menu 1', 'nav_menu' );
+
+	if ( ! $main_menu ) {
+		$main_menu = get_term_by( 'name', 'Main', 'nav_menu' );
+	}
 
 	// Check if the menu was actually found before trying to use it.
 	if ( $main_menu ) {

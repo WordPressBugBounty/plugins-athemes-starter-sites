@@ -108,6 +108,12 @@ class ATSS_Customizer_Importer {
 			do_action( 'customize_save', $wp_customize );
 		}
 
+		// Drop the stale custom CSS post pointer. The exported custom_css_post_id
+		// refers to a post on the source site and can resolve to the wrong post on
+		// the target site, hiding the imported Additional CSS. Removing it lets
+		// WordPress fall back to locating the imported custom_css post by theme slug.
+		unset( $data['mods']['custom_css_post_id'] );
+
 		// Loop through the mods and save the mods.
 		foreach ( $data['mods'] as $key => $val ) {
 
