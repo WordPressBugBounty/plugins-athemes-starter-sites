@@ -1434,6 +1434,776 @@ class Athemes_Starter_Sites_Importer {
 
 	}
 
+	/**
+	 * Set the importing author to the current user.
+	 *
+	 * Sync twin of the author side effect inside ajax_request_maybe(), without
+	 * the AJAX re-dispatch: ajax_request_maybe() calls wp_send_json() (which
+	 * exits) once time/attachment thresholds are reached, which would kill a
+	 * headless REST/MCP import mid-run. The synchronous path must never split.
+	 *
+	 * @param array $data Current post data.
+	 * @return array
+	 */
+	public function set_import_post_author( $data ) {
+
+		if ( ! empty( $data ) && is_array( $data ) ) {
+			$data['post_author'] = wp_get_current_user()->user_login;
+		}
+
+		return $data;
+	}
+
+	/**
+	 * Run a full demo import synchronously, in one call.
+	 *
+	 * Server-side orchestration of the same sequence the JS client drives over
+	 * AJAX: start -> required plugins -> contents -> widgets -> customizer ->
+	 * finish. Each step is a non-AJAX helper that RETURNS a result instead of
+	 * emitting JSON, so this method can aggregate them and short-circuit on a
+	 * fatal step. Widgets are treated as optional (a failure is recorded but
+	 * does not abort the import), matching the live AJAX flow. Used by the
+	 * athemes-starter-sites/import-site ability.
+	 *
+	 * Capability is the caller's responsibility (the ability checks
+	 * edit_theme_options; the plugin-install step additionally needs
+	 * install_plugins). No nonce check here — this is not request-driven.
+	 *
+	 * @param string $demo_id      Demo id (key in the demos list).
+	 * @param string $builder_type Builder slug, e.g. 'elementor' | 'gutenberg'.
+	 * @param array  $options      { @type bool $clean_previous Delete a previous starter-site import first. }
+	 * @return array {
+	 *     @type bool   $success Whether the import completed.
+	 *     @type string $message Human-readable summary.
+	 *     @type array  $steps   Per-step results keyed by step name.
+	 * }
+	 */
+	public function import( $demo_id, $builder_type, $options = array() ) {
+
+		// The ability calls instance(), which lazily constructs a fresh object
+		// whose after_setup_theme->init() (the only thing that fills $this->demos)
+		// can no longer fire. Repopulate on demand so validation has data.
+		if ( empty( $this->demos ) ) {
+			$this->demos = apply_filters( 'atss_register_demos_list', array() );
+		}
+
+		$demo_id      = sanitize_text_field( (string) $demo_id );
+		$builder_type = sanitize_text_field( (string) $builder_type );
+
+		$steps = array();
+
+		// Validate the demo + builder against the registered demos list.
+		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Invalid demo id.', 'athemes-starter-sites' ),
+				'steps'   => $steps,
+			);
+		}
+
+		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ] ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'Invalid builder type for this demo.', 'athemes-starter-sites' ),
+				'steps'   => $steps,
+			);
+		}
+
+		// A cached XML from a previous (possibly different-demo or aborted) run
+		// must not be reused: the sync path always downloads fresh.
+		$stale_xml = get_transient( 'atss_importer_data' );
+		if ( $stale_xml ) {
+			if ( file_exists( $stale_xml ) ) {
+				unlink( $stale_xml );
+			}
+			delete_transient( 'atss_importer_data' );
+		}
+
+		// 1. Start.
+		$steps['start'] = $this->run_import_start( $demo_id, $builder_type );
+
+		// 1b. Optional: clean a previous starter-site import (sync twin of the
+		// wizard's opt-in atss_import_clean step).
+		if ( ! empty( $options['clean_previous'] ) ) {
+			$steps['clean'] = $this->run_import_clean();
+		}
+
+		// 2. Required plugins (Elementor / Woo / etc. declared by the demo).
+		$steps['plugins'] = $this->run_import_plugins( $demo_id, $builder_type );
+		if ( ! $steps['plugins']['success'] ) {
+			return array(
+				'success' => false,
+				'message' => $steps['plugins']['message'],
+				'steps'   => $steps,
+			);
+		}
+
+		// 3. Contents (XML) — fatal on failure.
+		$steps['contents'] = $this->run_import_contents( $demo_id, $builder_type );
+		if ( ! $steps['contents']['success'] ) {
+			return array(
+				'success' => false,
+				'message' => $steps['contents']['message'],
+				'steps'   => $steps,
+			);
+		}
+
+		// 4. Widgets — optional. A failure is recorded but does not abort.
+		$steps['widgets'] = $this->run_import_widgets( $demo_id, $builder_type );
+
+		// 5. Customizer — fatal on failure.
+		$steps['customizer'] = $this->run_import_customizer( $demo_id, $builder_type );
+		if ( ! $steps['customizer']['success'] ) {
+			return array(
+				'success' => false,
+				'message' => $steps['customizer']['message'],
+				'steps'   => $steps,
+			);
+		}
+
+		// 6. Finish (cleanup, cache, term counts, stock status).
+		$steps['finish'] = $this->run_import_finish( $demo_id, $builder_type );
+
+		return array(
+			'success' => true,
+			'message' => sprintf(
+				/* translators: 1: demo name, 2: builder type. */
+				__( 'Imported "%1$s" (%2$s).', 'athemes-starter-sites' ),
+				isset( $this->demos[ $demo_id ]['name'] ) ? $this->demos[ $demo_id ]['name'] : $demo_id,
+				$builder_type
+			),
+			'steps'   => $steps,
+		);
+
+	}
+
+	/**
+	 * Step 1: fire the start hook. Non-AJAX twin of atss_import_start().
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_start( $demo_id, $builder_type ) {
+		do_action( 'atss_import_start', $demo_id, $builder_type );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Import started.', 'athemes-starter-sites' ),
+		);
+	}
+
+	/**
+	 * Optional clean step: delete everything a previous starter-site import
+	 * created. Non-AJAX twin of atss_import_clean() — same post/term/widget/
+	 * customizer cleanup, returning a result instead of emitting JSON.
+	 *
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_clean() {
+
+		wp_suspend_cache_invalidation( true );
+
+		global $wpdb;
+
+		$query  = $wpdb->prepare( "SELECT post_id FROM {$wpdb->postmeta} WHERE meta_key = %s", '_athemes_sites_imported_post' );
+		$result = $wpdb->get_col( $query );
+
+		if ( ! empty( $result ) ) {
+			foreach ( $result as $post_id ) {
+				$post_type = get_post_type( $post_id );
+				if ( $post_type === 'elementor_library' ) {
+					$_GET['force_delete_kit'] = true;
+				}
+				wp_delete_post( $post_id, true );
+			}
+		}
+
+		$query  = $wpdb->prepare( "SELECT term_id FROM {$wpdb->termmeta} WHERE meta_key = %s", '_athemes_sites_imported_term' );
+		$result = $wpdb->get_col( $query );
+
+		if ( ! empty( $result ) ) {
+			foreach ( $result as $term_id ) {
+				$term = get_term( $term_id );
+				if ( ! is_wp_error( $term ) && ! empty( $term ) && is_object( $term ) ) {
+					wp_delete_term( $term->term_id, $term->taxonomy );
+				}
+			}
+		}
+
+		wp_suspend_cache_invalidation( false );
+
+		$this->clean_widget_settings();
+		$this->clean_customizer_settings();
+
+		do_action( 'atss_import_clean' );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Previous import cleaned.', 'athemes-starter-sites' ),
+		);
+	}
+
+	/**
+	 * Step 2: install + activate every plugin the demo declares. Non-AJAX twin
+	 * of ajax_import_plugin(), looping the demo's plugin specs instead of a
+	 * single $_POST slug/path. Demo plugin specs carry name/slug/path/required
+	 * and optionally builder ('elementor'|'gutenberg'); builder-scoped entries
+	 * for the other builder are skipped. Only entries marked required => true
+	 * abort the import on failure. Plugin status is read without a capability
+	 * gate; install_plugins / activate_plugins are required only when an install
+	 * or activation is actually needed, so already-active plugins import fine
+	 * under DISALLOW_FILE_MODS.
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message, @type array $plugins }
+	 */
+	private function run_import_plugins( $demo_id, $builder_type ) {
+
+		$results = array();
+		$plugins = isset( $this->demos[ $demo_id ]['plugins'] ) && is_array( $this->demos[ $demo_id ]['plugins'] )
+			? $this->demos[ $demo_id ]['plugins']
+			: array();
+
+		if ( ! function_exists( 'is_plugin_active_for_network' ) || ! function_exists( 'activate_plugin' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		foreach ( $plugins as $plugin ) {
+
+			// Skip plugins scoped to a different builder than the one being imported.
+			if ( ! empty( $plugin['builder'] ) && $plugin['builder'] !== $builder_type ) {
+				continue;
+			}
+
+			$slug = isset( $plugin['slug'] ) ? $plugin['slug'] : '';
+			$path = isset( $plugin['path'] ) ? $plugin['path'] : '';
+
+			if ( empty( $slug ) || empty( $path ) ) {
+				continue;
+			}
+
+			$status = $this->get_plugin_status_uncapped( $path );
+
+			if ( 'not_installed' === $status ) {
+				if ( ! current_user_can( 'install_plugins' ) ) {
+					// Only a *required* plugin that cannot be installed aborts the import.
+					if ( ! empty( $plugin['required'] ) ) {
+						$blocked = defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS;
+						return array(
+							'success' => false,
+							'message' => $blocked
+								? sprintf(
+									/* translators: %s: plugin name. */
+									__( 'Plugin installation is disabled on this site (DISALLOW_FILE_MODS), so the required plugin cannot be installed: %s. Install it manually, then re-run the import.', 'athemes-starter-sites' ),
+									isset( $plugin['name'] ) ? $plugin['name'] : $slug
+								)
+								: sprintf(
+									/* translators: %s: plugin name. */
+									__( 'Insufficient permissions to install the required plugin: %s', 'athemes-starter-sites' ),
+									isset( $plugin['name'] ) ? $plugin['name'] : $slug
+								),
+							'plugins' => $results,
+						);
+					}
+					$results[ $path ] = $status;
+					continue;
+				}
+				$this->install_plugin( $slug );
+				$this->activate_plugin( $path );
+			} elseif ( 'inactive' === $status ) {
+				if ( current_user_can( 'activate_plugins' ) ) {
+					activate_plugin( $path, '', false, true );
+				} elseif ( ! empty( $plugin['required'] ) ) {
+					return array(
+						'success' => false,
+						'message' => sprintf(
+							/* translators: %s: plugin name. */
+							__( 'Insufficient permissions to activate the required plugin: %s', 'athemes-starter-sites' ),
+							isset( $plugin['name'] ) ? $plugin['name'] : $slug
+						),
+						'plugins' => $results,
+					);
+				}
+			}
+
+			do_action( 'atss_import_plugin', $slug, $path );
+
+			$final = $this->get_plugin_status_uncapped( $path );
+
+			// A non-required plugin that won't activate must not abort the import.
+			if ( 'active' !== $final && ! empty( $plugin['required'] ) ) {
+				return array(
+					'success' => false,
+					'message' => sprintf(
+						/* translators: %s: plugin name. */
+						__( 'Failed to install or activate the required plugin: %s', 'athemes-starter-sites' ),
+						isset( $plugin['name'] ) ? $plugin['name'] : $slug
+					),
+					'plugins' => $results,
+				);
+			}
+
+			$results[ $path ] = $final;
+		}
+
+		return array(
+			'success' => true,
+			'message' => __( 'Required plugins processed.', 'athemes-starter-sites' ),
+			'plugins' => $results,
+		);
+	}
+
+	/**
+	 * Plugin status without the install_plugins capability gate.
+	 *
+	 * get_plugin_status() returns null for users lacking install_plugins (and
+	 * under DISALLOW_FILE_MODS, where core maps that cap to do_not_allow),
+	 * which made the sync plugins step report already-active plugins as
+	 * failures. Reading install state requires no capability; capabilities are
+	 * checked only when an install/activation is actually attempted.
+	 *
+	 * @param string $plugin_path Plugin path (folder/file.php).
+	 * @return string 'not_installed' | 'active' | 'inactive'
+	 */
+	private function get_plugin_status_uncapped( $plugin_path ) {
+
+		if ( ! file_exists( WP_PLUGIN_DIR . '/' . $plugin_path ) ) {
+			return 'not_installed';
+		}
+
+		if ( in_array( $plugin_path, (array) get_option( 'active_plugins', array() ), true ) || is_plugin_active_for_network( $plugin_path ) ) {
+			return 'active';
+		}
+
+		return 'inactive';
+	}
+
+	/**
+	 * Step 3: download + import the demo XML. Non-AJAX twin of
+	 * ajax_import_contents() (content_type fixed to the default — no
+	 * placeholder-image substitution in a programmatic import).
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_contents( $demo_id, $builder_type ) {
+
+		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['content'] ) ) {
+			return array(
+				'success' => false,
+				'message' => __( 'The url address of the demo content is not specified.', 'athemes-starter-sites' ),
+			);
+		}
+
+		$xml_file_url  = $this->demos[ $demo_id ]['import'][ $builder_type ]['content'];
+		$xml_file_path = get_transient( 'atss_importer_data' );
+
+		if ( ! $xml_file_path || ! file_exists( $xml_file_path ) ) {
+
+			if ( ! function_exists( 'download_url' ) ) {
+				require_once ABSPATH . 'wp-admin/includes/file.php';
+			}
+
+			$temp_file = download_url( $xml_file_url, 5 );
+
+			if ( is_wp_error( $temp_file ) ) {
+				return array(
+					'success' => false,
+					'message' => __( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ),
+				);
+			}
+
+			$file_args = array(
+				'name'     => basename( $xml_file_url ),
+				'tmp_name' => $temp_file,
+				'error'    => 0,
+				'size'     => filesize( $temp_file ),
+			);
+
+			$overrides = array(
+				'test_form'   => false,
+				'test_size'   => true,
+				'test_upload' => true,
+				'mimes'       => array(
+					'xml' => 'text/xml',
+				),
+			);
+
+			$download_response = wp_handle_sideload( $file_args, $overrides );
+
+			if ( isset( $download_response['error'] ) ) {
+				return array(
+					'success' => false,
+					'message' => __( 'Failed to download demo xml file.', 'athemes-starter-sites' ),
+				);
+			}
+
+			$xml_file_path = $download_response['file'];
+
+			set_transient( 'atss_importer_data', $xml_file_path, HOUR_IN_SECONDS );
+		}
+
+		if ( ! class_exists( 'WP_Importer' ) ) {
+			if ( ! defined( 'WP_LOAD_IMPORTERS' ) ) {
+				define( 'WP_LOAD_IMPORTERS', true );
+			}
+			require_once ABSPATH . 'wp-admin/includes/class-wp-importer.php';
+		}
+
+		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WPImporterLogger.php';
+		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WPImporterLoggerCLI.php';
+		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WXRImportInfo.php';
+		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WXRImporter.php';
+		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/Logger.php';
+
+		set_time_limit( 0 );
+
+		$this->microtime = microtime( true );
+
+		add_filter( 'wxr_importer.pre_process.user', '__return_null' );
+		add_filter( 'wxr_importer.pre_process.post', array( $this, 'set_import_post_author' ) );
+		add_filter( 'wxr_importer.pre_process.post', array( $this, 'post_content_replace_attachment_urls' ) );
+		add_filter( 'wxr_importer.pre_process.post_meta', array( $this, 'post_meta_replace_attachment_urls' ), 10, 2 );
+		add_filter( 'wxr_importer.processed.post', array( $this, 'track_imported_post' ) );
+		add_filter( 'wxr_importer.processed.term', array( $this, 'track_imported_term' ) );
+
+		if ( class_exists( 'WooCommerce' ) ) {
+			add_filter( 'wxr_importer.pre_process.term', array( $this, 'woocommerce_product_attributes_registration' ) );
+			add_filter( 'add_term_metadata', array( $this, 'woocommerce_product_attributes_filter' ), 10, 5 );
+		}
+
+		$importer = new ATSS_WXRImporter( array(
+			'fetch_attachments' => true,
+			'default_author'    => get_current_user_id(),
+		) );
+
+		$this->importer = $importer;
+
+		$logger_options = apply_filters( 'atss_logger_options', array(
+			'logger_min_level' => 'warning',
+		) );
+
+		$logger            = new ATSS_Logger();
+		$logger->min_level = $logger_options['logger_min_level'];
+
+		$importer->set_logger( $logger );
+
+		$wizard_state = get_option( 'atss_wizard_state', array() );
+		if ( ! empty( $wizard_state['data']['pages']['selectedPages'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-page-filter.php';
+			new ATSS_Onboarding_Page_Filter();
+		}
+
+		if ( ! empty( $wizard_state['data']['contact'] ) ) {
+			require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+			new ATSS_Onboarding_Contact_Replacer();
+		}
+
+		$importer->import( $xml_file_path );
+
+		if ( $logger->error_output ) {
+			return array(
+				'success' => false,
+				'message' => $logger->error_output,
+			);
+		}
+
+		do_action( 'atss_import_contents' );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Content imported.', 'athemes-starter-sites' ),
+		);
+	}
+
+	/**
+	 * Step 4 (optional): import widgets. Non-AJAX twin of ajax_import_widgets()
+	 * with deliberately softened return semantics — every failure path returns
+	 * success=true with a note so the orchestration continues to the customizer
+	 * step, matching the live flow's tolerance of widget failures.
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_widgets( $demo_id, $builder_type ) {
+
+		try {
+			if ( ! ini_get( 'safe_mode' ) ) {
+				set_time_limit( 120 );
+			}
+
+			if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['widgets'] ) ) {
+				return array(
+					'success' => true,
+					'message' => __( 'Widget import skipped (none specified).', 'athemes-starter-sites' ),
+				);
+			}
+
+			$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['widgets'];
+
+			$raw = wp_remote_get(
+				wp_unslash( $file_url ),
+				array(
+					'timeout'   => 15,
+				)
+			);
+
+			if ( is_wp_error( $raw ) || 200 !== wp_remote_retrieve_response_code( $raw ) ) {
+				return array(
+					'success' => true,
+					'message' => __( 'Widget import skipped (file unavailable).', 'athemes-starter-sites' ),
+				);
+			}
+
+			try {
+				$this->clean_widget_settings();
+			} catch ( Exception $e ) {
+				error_log( 'ATSS Widget Import: Failed to clean widget settings - ' . $e->getMessage() );
+			} catch ( Error $e ) {
+				error_log( 'ATSS Widget Import: Error cleaning widget settings - ' . $e->getMessage() );
+			}
+
+			$data = json_decode( wp_remote_retrieve_body( $raw ) );
+
+			if ( empty( $data ) ) {
+				return array(
+					'success' => true,
+					'message' => __( 'Widget import skipped (invalid data).', 'athemes-starter-sites' ),
+				);
+			}
+
+			$wizard_state = get_option( 'atss_wizard_state', array() );
+			if ( ! empty( $wizard_state['data']['contact'] ) ) {
+				require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+				new ATSS_Onboarding_Contact_Replacer();
+			}
+
+			try {
+				$data = map_deep( $data, array( 'Athemes_Starter_Sites_Importer', 'replace_attachment_urls' ) );
+			} catch ( Exception $e ) {
+				error_log( 'ATSS Widget Import: Failed to process URLs - ' . $e->getMessage() );
+			} catch ( Error $e ) {
+				error_log( 'ATSS Widget Import: Error processing URLs - ' . $e->getMessage() );
+			}
+
+			$widgets = new ATSS_Widget_Importer();
+			$results = $widgets->import( $data );
+
+			if ( is_wp_error( $results ) ) {
+				error_log( 'ATSS Widget Import: Widget import failed - ' . $results->get_error_message() );
+				return array(
+					'success' => true,
+					'message' => __( 'Widget import completed with errors.', 'athemes-starter-sites' ),
+				);
+			}
+
+			try {
+				$available_widgets = ATSS_Widget_Importer::available_widgets();
+				$widget_instances  = array();
+
+				foreach ( $available_widgets as $widget_data ) {
+					if ( is_array( $widget_data ) && isset( $widget_data['id_base'] ) ) {
+						$widget_instances[ $widget_data['id_base'] ] = get_option( 'widget_' . $widget_data['id_base'] );
+					}
+				}
+
+				$sidebar_widgets = get_option( 'sidebars_widgets', array() );
+				update_option( '_athemes_sites_imported_widgets', $sidebar_widgets, 'no' );
+				do_action( 'atss_import_widgets', $sidebar_widgets, $widget_instances );
+			} catch ( Exception $e ) {
+				error_log( 'ATSS Widget Import: Post-import actions failed - ' . $e->getMessage() );
+			} catch ( Error $e ) {
+				error_log( 'ATSS Widget Import: Post-import actions error - ' . $e->getMessage() );
+			}
+
+			return array(
+				'success' => true,
+				'message' => __( 'Widgets imported.', 'athemes-starter-sites' ),
+			);
+
+		} catch ( Throwable $e ) {
+			error_log( 'ATSS Widget Import Exception: ' . $e->getMessage() );
+			return array(
+				'success' => true,
+				'message' => __( 'Widget import skipped (unexpected error).', 'athemes-starter-sites' ),
+			);
+		}
+	}
+
+	/**
+	 * Step 5: import customizer settings. Non-AJAX twin of
+	 * ajax_import_customizer().
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_customizer( $demo_id, $builder_type ) {
+
+		try {
+			if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['customizer'] ) ) {
+				return array(
+					'success' => false,
+					'message' => __( 'The url address of the demo customizer is not specified.', 'athemes-starter-sites' ),
+				);
+			}
+
+			$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['customizer'];
+
+			if ( ! ini_get( 'safe_mode' ) ) {
+				set_time_limit( 120 );
+			}
+
+			$raw = wp_remote_get(
+				wp_unslash( $file_url ),
+				array(
+					'timeout'   => 30,
+				)
+			);
+
+			if ( is_wp_error( $raw ) ) {
+				return array(
+					'success' => false,
+					'message' => sprintf(
+						/* translators: %s: error message. */
+						__( 'Failed to fetch customizer file: %s', 'athemes-starter-sites' ),
+						$raw->get_error_message()
+					),
+				);
+			}
+
+			if ( 200 !== (int) wp_remote_retrieve_response_code( $raw ) ) {
+				return array(
+					'success' => false,
+					'message' => sprintf(
+						/* translators: %d: HTTP status code. */
+						__( 'Failed to load customizer demo file. HTTP %d', 'athemes-starter-sites' ),
+						(int) wp_remote_retrieve_response_code( $raw )
+					),
+				);
+			}
+
+			$this->clean_customizer_settings();
+
+			$data = maybe_unserialize( wp_remote_retrieve_body( $raw ) );
+
+			if ( empty( $data ) || ! is_array( $data ) ) {
+				return array(
+					'success' => false,
+					'message' => __( 'Failed to parse customizer data. File may be corrupted.', 'athemes-starter-sites' ),
+				);
+			}
+
+			$wizard_state = get_option( 'atss_wizard_state', array() );
+			if ( ! empty( $wizard_state['data']['contact'] ) ) {
+				require_once ATSS_PATH . 'v2/onboarding/includes/class-contact-replacer.php';
+				new ATSS_Onboarding_Contact_Replacer();
+			}
+
+			$customizer = new ATSS_Customizer_Importer();
+			$results    = $customizer->import( $data );
+
+			if ( is_wp_error( $results ) ) {
+				return array(
+					'success' => false,
+					'message' => sprintf(
+						/* translators: %s: error message. */
+						__( 'Customizer import error: %s', 'athemes-starter-sites' ),
+						$results->get_error_message()
+					),
+				);
+			}
+
+			do_action( 'atss_import_customizer', $data );
+
+			return array(
+				'success' => true,
+				'message' => __( 'Customizer imported.', 'athemes-starter-sites' ),
+			);
+
+		} catch ( Throwable $e ) {
+			return array(
+				'success' => false,
+				'message' => sprintf(
+					/* translators: 1: message, 2: file, 3: line. */
+					__( 'Customizer Import Exception: %1$s in %2$s on line %3$s', 'athemes-starter-sites' ),
+					$e->getMessage(),
+					basename( $e->getFile() ),
+					$e->getLine()
+				),
+			);
+		}
+	}
+
+	/**
+	 * Step 6: finish import (cleanup, cache, term counts, stock). Non-AJAX twin
+	 * of ajax_import_finish(). Always returns success.
+	 *
+	 * @param string $demo_id      Demo id.
+	 * @param string $builder_type Builder slug.
+	 * @return array { @type bool $success, @type string $message }
+	 */
+	private function run_import_finish( $demo_id, $builder_type ) {
+
+		$xml_file_path = get_transient( 'atss_importer_data' );
+
+		if ( $xml_file_path && file_exists( $xml_file_path ) ) {
+			unlink( $xml_file_path );
+			delete_transient( 'atss_importer_data' );
+		}
+
+		if ( class_exists( 'Elementor\Plugin' ) ) {
+			Elementor\Plugin::$instance->files_manager->clear_cache();
+		}
+
+		$nav_menu_terms = get_terms( array(
+			'taxonomy'   => 'nav_menu',
+			'hide_empty' => false,
+			'meta_key'   => '_athemes_sites_imported_term',
+		) );
+
+		$nav_menu_term_ids = array();
+
+		if ( ! is_wp_error( $nav_menu_terms ) && ! empty( $nav_menu_terms ) ) {
+			foreach ( $nav_menu_terms as $nav_menu_term ) {
+				if ( empty( $nav_menu_term->count ) ) {
+					$nav_menu_term_ids[] = $nav_menu_term->term_id;
+				}
+			}
+		}
+
+		if ( ! empty( $nav_menu_term_ids ) ) {
+			wp_update_term_count_now( $nav_menu_term_ids, 'nav_menu' );
+		}
+
+		if ( class_exists( 'WooCommerce' ) ) {
+			$products = get_posts( array(
+				'post_type'      => 'product',
+				'posts_per_page' => -1,
+				'meta_key'       => '_athemes_sites_imported_post',
+			) );
+			if ( ! is_wp_error( $products ) && ! empty( $products ) ) {
+				foreach ( $products as $product ) {
+					update_post_meta( $product->ID, '_stock_status', 'instock' );
+				}
+			}
+			update_option( 'woocommerce_queue_flush_rewrite_rules', 'yes' );
+		}
+
+		do_action( 'atss_finish_import', $demo_id, array() );
+
+		delete_option( 'atss_wizard_state' );
+
+		return array(
+			'success' => true,
+			'message' => __( 'Import finished.', 'athemes-starter-sites' ),
+		);
+	}
+
 }
 
-new Athemes_Starter_Sites_Importer();
+Athemes_Starter_Sites_Importer::instance();
