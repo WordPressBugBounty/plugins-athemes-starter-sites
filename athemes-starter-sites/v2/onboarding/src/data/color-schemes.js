@@ -154,7 +154,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#ffffff',
 				'--bt-color-forms-background': '#ffffff',
 
-				'--bt-color-menu-bg': '#ffffff'
+				'--bt-color-menu-bg': '#ffffff',
+
+				'--wp--preset--color--color-0': '#212121',
+				'--wp--preset--color--color-1': '#757575',
+				'--wp--preset--color--color-2': '#212121',
+				'--wp--preset--color--color-3': '#212121',
+				'--wp--preset--color--color-4': '#212121',
+				'--wp--preset--color--color-5': '#f5f5f5',
+				'--wp--preset--color--color-6': '#ffffff',
+				'--wp--preset--color--color-7': '#ffffff'
 			}
 		},
 		{
@@ -194,7 +203,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#FFFFFF',
 				'--bt-color-forms-background': '#FFFFFF',
 
-				'--bt-color-menu-bg': '#ffffff'
+				'--bt-color-menu-bg': '#ffffff',
+
+				'--wp--preset--color--color-0': '#438061',
+				'--wp--preset--color--color-1': '#214E3A',
+				'--wp--preset--color--color-2': '#214E3A',
+				'--wp--preset--color--color-3': '#222222',
+				'--wp--preset--color--color-4': '#757575',
+				'--wp--preset--color--color-5': '#ECEEEC',
+				'--wp--preset--color--color-6': '#ffffff',
+				'--wp--preset--color--color-7': '#ffffff'
 			}
 		},
 		{
@@ -234,7 +252,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#ffffff',
 				'--bt-color-forms-background': '#ffffff',
 
-				'--bt-color-menu-bg': '#ffffff'
+				'--bt-color-menu-bg': '#ffffff',
+
+				'--wp--preset--color--color-0': '#7877E6',
+				'--wp--preset--color--color-1': '#4B49DE',
+				'--wp--preset--color--color-2': '#000000',
+				'--wp--preset--color--color-3': '#222222',
+				'--wp--preset--color--color-4': '#4F4F4F',
+				'--wp--preset--color--color-5': '#F4F4F3',
+				'--wp--preset--color--color-6': '#ffffff',
+				'--wp--preset--color--color-7': '#ffffff'
 			}
 		},
 		{
@@ -274,7 +301,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#ffffff',
 				'--bt-color-forms-background': '#ffffff',
 
-				'--bt-color-menu-bg': '#ffffff'
+				'--bt-color-menu-bg': '#ffffff',
+
+				'--wp--preset--color--color-0': '#1470AF',
+				'--wp--preset--color--color-1': '#105787',
+				'--wp--preset--color--color-2': '#072B43',
+				'--wp--preset--color--color-3': '#212C34',
+				'--wp--preset--color--color-4': '#9A9D9F',
+				'--wp--preset--color--color-5': '#F3F4F4',
+				'--wp--preset--color--color-6': '#ffffff',
+				'--wp--preset--color--color-7': '#ffffff'
 			}
 		},
 		{
@@ -314,7 +350,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#141B22',
 				'--bt-color-forms-background': '#141B22',
 
-				'--bt-color-menu-bg': '#141B22'
+				'--bt-color-menu-bg': '#141B22',
+
+				'--wp--preset--color--color-0': '#FDB336',
+				'--wp--preset--color--color-1': '#DD8B02',
+				'--wp--preset--color--color-2': '#FFFFFF',
+				'--wp--preset--color--color-3': '#948F87',
+				'--wp--preset--color--color-4': '#1E2933',
+				'--wp--preset--color--color-5': '#0F141A',
+				'--wp--preset--color--color-6': '#141B22',
+				'--wp--preset--color--color-7': '#141B22'
 			}
 		},
 		{
@@ -354,7 +399,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#FFFFFF',
 				'--bt-color-forms-background': '#FFFFFF',
 
-				'--bt-color-menu-bg': '#FFFFFF'
+				'--bt-color-menu-bg': '#FFFFFF',
+
+				'--wp--preset--color--color-0': '#FF524D',
+				'--wp--preset--color--color-1': '#E80600',
+				'--wp--preset--color--color-2': '#40140F',
+				'--wp--preset--color--color-3': '#5B3F3E',
+				'--wp--preset--color--color-4': '#ACA2A1',
+				'--wp--preset--color--color-5': '#F4E3E0',
+				'--wp--preset--color--color-6': '#FFFFFF',
+				'--wp--preset--color--color-7': '#FFFFFF'
 			}
 		},
 		{
@@ -394,7 +448,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#FFFFFF',
 				'--bt-color-forms-background': '#FFFFFF',
 
-				'--bt-color-menu-bg': '#FFFFFF'
+				'--bt-color-menu-bg': '#FFFFFF',
+
+				'--wp--preset--color--color-0': '#E97B6B',
+				'--wp--preset--color--color-1': '#C84835',
+				'--wp--preset--color--color-2': '#131B51',
+				'--wp--preset--color--color-3': '#3E425B',
+				'--wp--preset--color--color-4': '#A1A3AC',
+				'--wp--preset--color--color-5': '#F7EAE8',
+				'--wp--preset--color--color-6': '#FFFFFF',
+				'--wp--preset--color--color-7': '#FFFFFF'
 			}
 		},
 		{
@@ -434,7 +497,16 @@ export const themeColorSchemes = {
 				'--bt-color-button-hover': '#FFFFFF',
 				'--bt-color-forms-background': '#FFFFFF',
 
-				'--bt-color-menu-bg': '#FFFFFF'
+				'--bt-color-menu-bg': '#FFFFFF',
+
+				'--wp--preset--color--color-0': '#0AA99D',
+				'--wp--preset--color--color-1': '#066B63',
+				'--wp--preset--color--color-2': '#0B0C0F',
+				'--wp--preset--color--color-3': '#202833',
+				'--wp--preset--color--color-4': '#C5C7C8',
+				'--wp--preset--color--color-5': '#E9F3F2',
+				'--wp--preset--color--color-6': '#FFFFFF',
+				'--wp--preset--color--color-7': '#FFFFFF'
 			}
 		}
 	]

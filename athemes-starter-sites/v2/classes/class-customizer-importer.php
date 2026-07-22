@@ -50,14 +50,14 @@ class ATSS_Customizer_Importer {
 				esc_html__( 'Error: The customizer import file is not in a correct format. Please make sure to use the correct customizer import file.', 'athemes-starter-sites' )
 			);
 		}
-		
+
 		// Allow import if the template matches either:
 		// 1. The parent theme (template)
 		// 2. The current theme/child theme (stylesheet)
 		// 3. Apply filter to allow custom theme matching logic
 		$theme_matches = ( $data['template'] === $template || $data['template'] === $stylesheet );
 		$theme_matches = apply_filters( 'atss_customizer_import_theme_match', $theme_matches, $data['template'], $template, $stylesheet );
-		
+
 		if ( ! $theme_matches ) {
 			return new WP_Error(
 				'customizer_import_wrong_theme',
@@ -123,6 +123,27 @@ class ATSS_Customizer_Importer {
 
 			set_theme_mod( $key, $val );
 
+		}
+
+		// Import Additional CSS for the active theme.
+		if ( function_exists( 'wp_update_custom_css_post' ) && array_key_exists( 'wp_css', $data ) ) {
+			$custom_css_post = wp_update_custom_css_post(
+				(string) $data['wp_css'],
+				array(
+					'stylesheet' => $stylesheet,
+				)
+			);
+
+			if ( is_wp_error( $custom_css_post ) ) {
+				return $custom_css_post;
+			}
+
+			set_theme_mod(
+				'custom_css_post_id',
+				$custom_css_post->ID
+			);
+
+			$data['mods']['custom_css_post_id'] = $custom_css_post->ID;
 		}
 
 		if ( $use_wp_customize_save_hooks ) {

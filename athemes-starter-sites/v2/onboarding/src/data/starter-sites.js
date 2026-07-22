@@ -38,6 +38,33 @@ export const getStarterSiteById = ( id ) => {
 };
 
 /**
+ * Get the preview URL for a starter site and builder.
+ *
+ * Falls back to the default preview URL for demos that do not provide
+ * builder-specific previews.
+ *
+ * @param {Object} site    Starter site data.
+ * @param {string} builder Selected builder.
+ * @return {string} Preview URL.
+ */
+export const getStarterSitePreview = (
+	site,
+	builder = 'gutenberg'
+) => {
+	if ( ! site ) {
+		return '';
+	}
+
+	// The petshop demo ships an Elementor variant ( .../botiga-petshop-el/ ), but
+	// its previews always use the standard ( non-Elementor ) site so the wizard's
+	// live color/typography injection matches the previewed markup. The actual
+	// import still uses the selected builder ( handled server-side ).
+	const previewBuilder = site.id === 'petshop' ? 'gutenberg' : builder;
+
+	return site.previews?.[ previewBuilder ] || site.preview || '';
+};
+
+/**
  * Get the onboarding settings.
  *
  * @return {Object} The settings object.
@@ -54,4 +81,3 @@ export const getOnboardingSettings = () => {
 export const getThemeName = () => {
 	return window.atssOnboarding?.themeName || 'sydney';
 };
-

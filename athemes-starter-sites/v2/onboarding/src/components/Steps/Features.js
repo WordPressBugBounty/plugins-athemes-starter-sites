@@ -239,9 +239,16 @@ const ensureBotigaBuilderAddonPlugin = ( plugins, selectedBuilder ) => {
 		? 'athemes-blocks'
 		: 'athemes-addons-for-elementor-lite';
 
-	const normalizedPlugins = plugins.filter(
-		( plugin ) => plugin.slug !== excludedSlug
-	);
+	const normalizedPlugins = plugins.filter( ( plugin ) => {
+		if ( plugin.slug !== excludedSlug ) {
+			return true;
+		}
+
+		return (
+			plugin.required === true ||
+			plugin.builder === selectedBuilder
+		);
+	} );
 
 	if ( normalizedPlugins.some( ( plugin ) => plugin.slug === addonSlug ) ) {
 		return normalizedPlugins;
@@ -273,7 +280,7 @@ const getInitialSelection = ( plugins, contactSelected = false ) => {
 			const info = pluginInfo[ plugin.slug ] || {};
 
 			if ( plugin.slug === 'wpforms-lite' ) {
-				return contactSelected;
+				return plugin.required === true || contactSelected;
 			}
 
 			if (

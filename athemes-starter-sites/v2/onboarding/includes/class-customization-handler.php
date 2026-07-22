@@ -107,6 +107,19 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 						set_theme_mod( 'site_logo_size_mobile', $logo_size );
 					}
 				}
+			} elseif ( ! $has_site_logo ) {
+				// No logo was chosen in the wizard: clear the demo logo imported from
+				// the Customizer so it does not persist, matching the standalone importer
+				// experience.
+				remove_theme_mod( 'custom_logo' );
+
+				if ( $is_botiga ) {
+					remove_theme_mod( 'site_logo' );
+				}
+
+				remove_theme_mod( 'site_logo_size_desktop' );
+				remove_theme_mod( 'site_logo_size_tablet' );
+				remove_theme_mod( 'site_logo_size_mobile' );
 			}
 
 			// Apply show/hide site title.
@@ -284,6 +297,18 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 				set_theme_mod( $theme_mod, $sanitized_value );
 			}
 
+			// Persist the non-variable-backed controls (header, footer, search
+			// form, product titles) that mirror the onboarding preview rules in
+			// v2/onboarding/src/data/botiga-non-variable-color-rules.js.
+			$this->apply_botiga_non_variable_theme_mods( $colors );
+
+			// Stash the resolved palette so the theme's finish-import routine can
+			// recolor mega menus and menu-item badges after the menus have been
+			// assigned to their locations and the mega-menu module is loaded. Doing
+			// it here (mid-import) is too early: the menu isn't located yet, so the
+			// mega-menu CSS cannot be regenerated. See botiga_setup_after_import().
+			set_transient( 'atss_botiga_wizard_palette', $this->get_botiga_palette_map( $colors ), HOUR_IN_SECONDS );
+
 			if ( empty( $selected_color_scheme ) ) {
 				return;
 			}
@@ -319,6 +344,221 @@ if ( ! class_exists( 'ATSS_Onboarding_Customization_Handler' ) ) {
 				}
 
 				set_theme_mod( 'custom_color' . $index, $sanitized_value );
+			}
+		}
+
+		/**
+		 * Build the Botiga palette-slot color map from wizard custom colors.
+		 *
+		 * Mirrors getBotigaNonVariablePaletteMap() in
+		 * v2/onboarding/src/data/botiga-non-variable-color-rules.js so the colors
+		 * persisted after import match the onboarding preview.
+		 *
+		 * @since 1.4.1
+		 * @param array $colors The custom colors keyed by CSS variable.
+		 * @return array Palette slot ('color1'..'color8') to sanitized hex color.
+		 */
+		private function get_botiga_palette_map( $colors ) {
+			$sources = array(
+				'color1' => array( '--bt-color-button-bg' ),
+				'color2' => array( '--bt-color-button-bg-hover' ),
+				'color3' => array( '--bt-color-post-title' ),
+				'color4' => array( '--bt-color-body-text' ),
+				'color5' => array( '--bt-color-forms-borders' ),
+				'color6' => array( '--bt-color-content-cards-bg' ),
+				'color7' => array( '--bt-color-bg' ),
+				'color8' => array( '--bt-color-menu-bg', '--bt-color-bg' ),
+			);
+
+			$palette = array();
+
+			foreach ( $sources as $slot => $css_vars ) {
+				$palette[ $slot ] = '';
+
+				foreach ( $css_vars as $css_var ) {
+					if ( empty( $colors[ $css_var ] ) ) {
+						continue;
+					}
+
+					$sanitized = sanitize_hex_color( $colors[ $css_var ] );
+
+					if ( ! $sanitized ) {
+						continue;
+					}
+
+					$palette[ $slot ] = $sanitized;
+
+					break;
+				}
+			}
+
+			return $palette;
+		}
+
+		/**
+		 * Apply Botiga non-variable-backed controls as theme mods.
+		 *
+		 * These controls are not tied to CSS custom properties, so Botiga sets
+		 * them individually when a palette is chosen in the Customizer. The slot
+		 * groups below mirror that engine exactly (the elements1..8 lists in the
+		 * theme's assets/js/customizer-scripts.js color_palettes handler), so an
+		 * imported site matches a native palette selection instead of leaving
+		 * unset controls at the theme's dark #212121 default. The remaining
+		 * variable-backed controls (button/heading/body/forms/background) are
+		 * handled just above in apply_botiga_color_customizations(). A handful of
+		 * extra controls Botiga's palette does not touch (comments, pagination,
+		 * tags, block search, site-info, mobile off-canvas) are also painted here
+		 * to match the onboarding preview rules.
+		 *
+		 * @since 1.4.1
+		 * @param array $colors The custom colors keyed by CSS variable.
+		 * @return void
+		 */
+		private function apply_botiga_non_variable_theme_mods( $colors ) {
+			$palette = $this->get_botiga_palette_map( $colors );
+
+			$theme_mods_by_slot = array(
+				'color1' => array(
+					'botiga_reading_progress_bar_background',
+					'botiga_tabs_nav_link_border_color_active',
+					'comments_comment_reply_link_background',
+					'footer_credits_links_color',
+					'pagination_background_active',
+					'pagination_color_active',
+					'ql_item_bg_hover',
+					'scrolltop_bg_color',
+					'shop_archive_header_button_border_color',
+					'shop_archive_header_button_color',
+					'single_product_tabs_border_color_active',
+					'single_product_tabs_text_color',
+					'single_product_tabs_text_color_active',
+					'tags_links_border_color',
+					'tags_links_color',
+					'wp_block_search_button_background',
+				),
+
+				'color2' => array(
+					'comments_comment_reply_link_background_hover',
+					'footer_credits_links_color_hover',
+					'footer_widgets_links_hover_color',
+					'main_header_color_hover',
+					'main_header_sticky_active_color_hover',
+					'main_header_sticky_active_submenu_color_hover',
+					'main_header_submenu_color_hover',
+					'mobile_offcanvas_close_color_hover',
+					'ql_item_color_hover',
+					'scrolltop_bg_color_hover',
+					'shop_archive_header_button_background_color_hover',
+					'shop_archive_header_button_border_color_hover',
+					'site_info_link_color_hover',
+					'wp_block_search_button_background_hover',
+				),
+
+				'color3' => array(
+					'bhfb_contact_info_icon_color',
+					'bhfb_search_icon_color',
+					'bhfb_woo_icons_color',
+					'botiga_accordion_item_arrow_border_color_active',
+					'botiga_accordion_item_arrow_border_color_hover',
+					'footer_widgets_title_color',
+					'loop_post_meta_color',
+					'loop_post_title_color',
+					'main_header_color',
+					'main_header_sticky_active_color',
+					'main_header_sticky_active_submenu_color',
+					'main_header_submenu_color',
+					'mobile_header_color',
+					'mobile_offcanvas_close_color',
+					'offcanvas_menu_color',
+					'ql_item_color',
+					'shop_archive_header_description_color',
+					'shop_archive_header_title_color',
+					'shop_product_product_title',
+					'single_post_title_color',
+					'single_product_title_color',
+					'site_description_color',
+					'site_info_icon_color',
+					'site_info_link_color',
+					'site_info_text_color',
+					'site_title_color',
+				),
+
+				'color4' => array(
+					'footer_credits_text_color',
+					'footer_widgets_links_color',
+					'footer_widgets_text_color',
+					'loop_post_text_color',
+					'main_header_bottom_color',
+					'single_sticky_add_to_cart_style_color_content',
+					'topbar_color',
+				),
+
+				'color5' => array(
+					'botiga_accordion_item_arrow_border_color',
+					'botiga_footer_row__above_footer_row_border_top_color',
+					'botiga_footer_row__below_footer_row_border_top_color',
+					'botiga_footer_row__main_footer_row_border_top_color',
+					'botiga_header_row__above_header_row_border_bottom_color',
+					'botiga_header_row__below_header_row_border_bottom_color',
+					'botiga_header_row__main_header_row_border_bottom_color',
+					'ql_item_border_color',
+					'single_product_tabs_remaining_borders',
+					'single_sticky_add_to_cart_style_color_border',
+					'site_info_border_color',
+				),
+
+				'color6' => array(
+					'botiga_footer_row__above_footer_row_background_color',
+					'botiga_footer_row__below_footer_row_background_color',
+					'botiga_footer_row__main_footer_row_background_color',
+					'botiga_tabs_nav_link_background',
+					'footer_credits_background',
+					'footer_widgets_background',
+					'ql_background_color',
+					'single_product_gallery_styles_background_color',
+					'single_product_tabs_background_color',
+					'single_product_tabs_background_color_active',
+					'single_sticky_add_to_cart_style_color_background',
+					'site_footer_background',
+				),
+
+				'color7' => array(
+					'comments_comment_reply_link_color',
+					'comments_comment_reply_link_color_hover',
+					'scrolltop_color',
+					'scrolltop_color_hover',
+					'single_product_reviews_advanced_section_bg_color',
+					'topbar_background',
+					'wp_block_search_button_color',
+				),
+
+				'color8' => array(
+					'botiga_header_row__above_header_row_background_color',
+					'botiga_header_row__below_header_row_background_color',
+					'botiga_header_row__main_header_row_background_color',
+					'login_register_submenu_background',
+					'main_header_background',
+					'main_header_bottom_background',
+					'main_header_sticky_active_background',
+					'main_header_sticky_active_submenu_background_color',
+					'main_header_submenu_background',
+					'mobile_header_background',
+					'mobile_offcanvas_background_color',
+					'offcanvas_menu_background',
+					'shop_archive_header_background_color',
+					'shop_archive_header_button_background_color',
+					'shop_archive_header_button_color_hover',
+				),
+			);
+
+			foreach ( $theme_mods_by_slot as $slot => $theme_mods ) {
+				if ( empty( $palette[ $slot ] ) ) {
+					continue;
+				}
+
+				foreach ( $theme_mods as $theme_mod ) {
+					set_theme_mod( $theme_mod, $palette[ $slot ] );
+				}
 			}
 		}
 

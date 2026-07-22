@@ -9,7 +9,7 @@ import { __ } from '@wordpress/i18n';
 import { TextControl, ToggleControl, RangeControl } from '@wordpress/components';
 import { Footer, Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
-import { getStarterSiteById, getThemeName } from '../../data/starter-sites';
+import { getStarterSiteById, getStarterSitePreview, getThemeName } from '../../data/starter-sites';
 import { getColorSchemesForSite } from '../../data/color-schemes';
 import { getTypographyPairsForSite, getTypographyPairById } from '../../data/typography-pairs';
 import MediaUploadControl from '../Controls/MediaUploadControl';
@@ -134,7 +134,7 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 			return;
 		}
 
-		const non_variable_css = buildBotigaNonVariableCss( colors );
+		const non_variable_css = buildBotigaNonVariableCss( colors, selectedSiteId );
 		const scoped_variable_css =
 			buildBotigaScopedVariableOverrideCss( colors );
 
@@ -151,47 +151,54 @@ function Customize( { onBack, onContinue, navigationLoading, navigationError } )
 			css,
 			'atss-botiga-non-variable-colors'
 		);
-	}, [ selectedColorScheme, colorSchemes, customColors ] );
+	}, [ selectedColorScheme, colorSchemes, customColors, selectedSiteId ] );
 
 	useLogoPreviewSync( siteLogo, logoHeight );
 	useLogoHeightPreviewSync( logoHeight );
 	useSiteTitlePreviewSync( siteTitle, showSiteTitle, siteLogo );
 	useTypographyPreviewSync( selectedTypographyPair, typographyPairs );
 
-	// Get the site data and preview URL
+	// Get the site data and preview URL.
 	const previewUrl = useMemo( () => {
-		if ( selectedSiteId ) {
-			const site = getStarterSiteById( selectedSiteId );
-			if ( site && site.preview ) {
-				let url = site.preview;
+		if ( ! selectedSiteId ) {
+			return window.atssOnboarding?.homeUrl || window.location.origin;
+		}
 
-				// If builder is Gutenberg, append -gb to the URL slug
-				if ( builder === 'gutenberg' ) {
-					// Clean up double dashes in URL
-					if ( selectedSiteId !== 'resume' ) {
-						url = url.replace( /--/g, '-' );
-					}
+		const site = getStarterSiteById( selectedSiteId );
+		let url = getStarterSitePreview( site, builder );
 
-					if ( isBotiga ) { // Leave early, if Botiga is in use.
-						return url;
-					}
-					// Transform: https://demo.athemes.com/sydney-main/ → https://demo.athemes.com/sydney-main-gb/
-					url = url.replace( /\/([^\/\?]+)(\/)?(\?.*)?$/, '/$1-gb$2$3' );
+		if ( ! url ) {
+			return window.atssOnboarding?.homeUrl || window.location.origin;
+		}
 
-					if ( selectedSiteId === 'cafe' ) { // Special case for Cafe template
-						url = 'https://demo.athemes.com/sp-cafe-gb/';
-					}
+		// If builder is Gutenberg, append -gb to the URL slug.
+		if ( builder === 'gutenberg' ) {
+			// Clean up double dashes in URL.
+			if ( selectedSiteId !== 'resume' ) {
+				url = url.replace( /--/g, '-' );
+			}
 
-					if ( selectedSiteId === 'author' ) { // Special case for Author template
-						url = 'https://demo.athemes.com/sp-author-gb/';
-					}
-				}
-
+			if ( isBotiga ) {
 				return url;
 			}
+
+			// Transform: https://demo.athemes.com/sydney-main/
+			// into https://demo.athemes.com/sydney-main-gb/.
+			url = url.replace(
+				/\/([^\/\?]+)(\/)?(\?.*)?$/,
+				'/$1-gb$2$3'
+			);
+
+			if ( selectedSiteId === 'cafe' ) {
+				url = 'https://demo.athemes.com/sp-cafe-gb/';
+			}
+
+			if ( selectedSiteId === 'author' ) {
+				url = 'https://demo.athemes.com/sp-author-gb/';
+			}
 		}
-		// No starter selected — show user's own site
-		return window.atssOnboarding?.homeUrl || window.location.origin;
+
+		return url;
 	}, [ selectedSiteId, builder ] );
 
 	// Add preconnect hints for faster iframe loading

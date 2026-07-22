@@ -44,6 +44,8 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 			require_once ATSS_PATH . 'v2/classes/class-customizer-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-core-helpers.php';
+			require_once ATSS_PATH . 'v2/classes/class-wpforms-helper.php';
+			require_once ATSS_PATH . 'v2/classes/class-sublium-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-abilities.php';
 
 			// Optional onboarding wizard (opt-in via filter).
@@ -157,7 +159,7 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 			if ( $current === $demo_id ) {
 				return false;
 			}
-			
+
 			wp_remote_get( add_query_arg( array( 'theme' => $theme, 'demo_id' => $demo_id ), 'https://www.athemes.com/reports/starters.php' ),
 				array(
 					'timeout'    => 30,

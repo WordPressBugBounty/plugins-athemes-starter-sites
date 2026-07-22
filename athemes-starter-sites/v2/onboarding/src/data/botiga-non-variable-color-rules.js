@@ -27,7 +27,7 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'tags_links_border_color',
 		'pagination_background_active',
 		'pagination_color_active',
-		'button_background'
+		'button_background',
 	],
 
 	color2: [
@@ -37,13 +37,12 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'main_header_sticky_active_color_hover',
 		'main_header_color_hover',
 		'main_header_sticky_active_submenu_color_hover',
-		'main_header_submenu_color_hover',
 		'ql_item_color_hover',
 		'comments_comment_reply_link_background_hover',
 		'wp_block_search_button_background_hover',
 		'mobile_offcanvas_close_color_hover',
 		'site_info_link_color_hover',
-		'button_background_hover'
+		'button_background_hover',
 	],
 
 	color3: [
@@ -66,7 +65,11 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'mobile_offcanvas_close_color',
 		'site_info_text_color',
 		'site_info_link_color',
-		'site_info_icon_color'
+		'site_info_icon_color',
+	],
+
+	color4: [
+		'main_header_submenu_color_hover',
 	],
 
 	color5: [
@@ -80,7 +83,7 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'botiga_footer_row__below_footer_row_border_top_color',
 		'ql_item_border_color',
 		'botiga_accordion_item_arrow_border_color',
-		'site_info_border_color'
+		'site_info_border_color',
 	],
 
 	color6: [
@@ -92,7 +95,7 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'ql_background_color',
 		'botiga_tabs_nav_link_background',
 		'site_footer_background',
-		'footer_widgets_background'
+		'footer_widgets_background',
 	],
 
 	color7: [
@@ -102,7 +105,8 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'comments_comment_reply_link_color',
 		'comments_comment_reply_link_color_hover',
 		'wp_block_search_button_color',
-		'button_text'
+		'button_text',
+		'main_header_submenu_background',
 	],
 
 	color8: [
@@ -112,16 +116,69 @@ export const botigaNonVariableBackedColorControlsByGroup = {
 		'mobile_offcanvas_background_color',
 		'shop_archive_header_background_color',
 		'custom_background',
-		'button_text_hover'
-	]
+		'button_text_hover',
+	],
+};
+
+/**
+ * Botiga starter-site-specific non-variable-backed controls.
+ *
+ * Add control names under the palette slot that should provide their color.
+ * Each control must also have a matching rule builder in
+ * botigaNonVariableBackedRuleMap.
+ */
+export const botigaNonVariableBackedColorControlsBySite = {
+	petshop: {
+		color1: [ 'petshop_color_1', 'petshop_mega_menu_link_hover' ],
+		color2: [ 'petshop_color_2' ],
+		color3: [ 'petshop_mega_menu_link' ],
+		color4: [ 'petshop_color_4' ],
+		color5: [ 'petshop_mega_menu_heading_divider' ],
+		color6: [ 'petshop_color_6' ],
+		color7: [ 'petshop_mega_menu_background' ],
+		color8: [ 'petshop_color_8' ],
+	},
+};
+
+/**
+ * Get the non-variable-backed controls for a Botiga starter site.
+ *
+ * Global controls are combined with controls defined specifically for the
+ * selected starter site.
+ *
+ * @param {string} siteId Selected starter site ID.
+ * @return {Object} Controls grouped by palette slot.
+ */
+export const getBotigaNonVariableBackedColorControlsByGroup = ( siteId = '' ) => {
+	const siteControls = botigaNonVariableBackedColorControlsBySite[ siteId ] || {};
+
+	const groupNames = new Set( [
+		...Object.keys( botigaNonVariableBackedColorControlsByGroup ),
+		...Object.keys( siteControls ),
+	] );
+
+	return Array.from( groupNames ).reduce( ( controlsByGroup, groupName ) => {
+		const globalControls = botigaNonVariableBackedColorControlsByGroup[ groupName ] || [];
+
+		controlsByGroup[ groupName ] = Array.from(
+			new Set( [ ...globalControls, ...( siteControls[ groupName ] || [] ) ] )
+		);
+
+		return controlsByGroup;
+	}, {} );
 };
 
 /**
  * Botiga non-variable-backed controls in a flat list.
  */
-export const botigaNonVariableBackedColorControls = Object.values(
-	botigaNonVariableBackedColorControlsByGroup
-).flat();
+export const botigaNonVariableBackedColorControls = Array.from(
+	new Set( [
+		...Object.values( botigaNonVariableBackedColorControlsByGroup ).flat(),
+		...Object.values( botigaNonVariableBackedColorControlsBySite ).flatMap( ( controlsByGroup ) =>
+			Object.values( controlsByGroup ).flat()
+		),
+	] )
+);
 
 /**
  * Map control names to CSS rule builders.
@@ -129,6 +186,104 @@ export const botigaNonVariableBackedColorControls = Object.values(
 export const botigaNonVariableBackedRuleMap = {
 	scrolltop_bg_color: ( color ) => `
 		.back-to-top {
+			background-color: ${ color } !important;
+		}
+	`,
+
+	petshop_color_1: ( color ) => `
+		.bhfb-component-woo_icons .header-item svg:not(.stroke-based),
+		.at-block-icon .at-block-icon__icon svg {
+			fill: ${ color } !important;
+		}
+
+		.botiga-breadcrumb-trail ul li a:hover,
+		.botiga-breadcrumb-trail ul li a:visited,
+		.at-block-post-grid .at-block-post-grid__button-button,
+		.wp-block-group .at-block-post-grid .at-block-post-grid__title a:hover {
+			color: ${ color } !important;
+		}
+
+		.back-to-top,
+		.bhfb-component-woo_icons .site-header-cart .count-number,
+		.bhfb-component-woo_icons .header-wishlist-icon .count-number,
+		.botiga-badge {
+			background-color: ${ color } !important;
+		}
+
+		.at-block-post-grid__button-button,
+		.bhfb-component-woo_icons .site-header-cart .count-number,
+		.bhfb-component-woo_icons .header-wishlist-icon .count-number {
+			border-color: ${ color } !important;
+		}
+	`,
+
+	petshop_color_2: ( color ) => `
+		.bhfb-row-wrapper.bhfb-above_header_row,
+		.swiper-pagination-bullets .at-block-bullets--bullet,
+		.at-block-post-grid__button-button:hover,
+		.back-to-top:hover {
+			background-color: ${ color } !important;
+		}
+
+		a,
+		.botiga-breadcrumb-trail ul li a,
+		.wp-block-group .at-block-post-grid .at-block-post-grid__meta,
+		.wp-block-group .at-block-post-grid .at-block-post-grid__title a {
+			color: ${ color };
+		}
+
+		.at-block-taxonomy-grid__title a,
+		.bhfb-footer .widget-column .widget .widget-title {
+			color: ${ color } !important;
+		}
+
+		.at-block-nav:before,
+		.at-block-post-grid__button-button:hover {
+			border-color: ${ color } !important;
+		}
+	`,
+
+	petshop_color_4: ( color ) => `
+		.bhfb-component-woo_icons .header-item:hover svg:not(.stroke-based) {
+			fill: ${ color } !important;
+		}
+
+		.bhfb-footer .widget-column .widget a,
+		.bhfb .botiga-footer-copyright-navigation a,
+		.bhfb .botiga-credits,
+		.botiga-breadcrumb-trail,
+		.bhfb-footer .widget-column .widget {
+			color: ${ color } !important;
+		}
+	`,
+
+	petshop_color_6: ( color ) => `
+		body:not(.home) .entry-content .at-block-icon__icon,
+		.wp-block-column.has-color-4-background-color,
+		.wp-block-group.has-color-4-background-color {
+			background-color: ${ color } !important;
+		}
+
+		.bhfb .secondary-navigation a.botiga-dropdown-link:hover {
+			color: ${ color } !important;
+		}
+	`,
+
+	petshop_color_7: ( color ) => `
+		.bhfb.bhfb-header .bhfb-component-html,
+		.at-block-post-grid__button-button:hover,
+		.bhfb .secondary-navigation a.botiga-dropdown-link,
+		.bhfb-component-woo_icons .site-header-cart .count-number,
+		.bhfb-component-woo_icons .header-wishlist-icon .count-number {
+			color: ${ color } !important;
+		}
+		.back-to-top svg {
+			stroke: ${ color } !important;
+		}
+	`,
+
+	petshop_color_8: ( color ) => `
+		.bhfb-footer {
 			background-color: ${ color } !important;
 		}
 	`,
@@ -319,6 +474,51 @@ export const botigaNonVariableBackedRuleMap = {
 		.bhfb .botiga-credits a:hover,
 		.site-info a:hover {
 			color: ${ color } !important;
+		}
+	`,
+
+	petshop_mega_menu_background: ( color ) => `
+		.botiga-mega-menu > .sub-menu,
+		.bhfb .botiga-mega-menu > .sub-menu,
+		.botiga-mega-menu.botiga-mega-menu-contained-full-width > .sub-menu:before {
+			background-color: ${ color } !important;
+		}
+	`,
+
+	petshop_mega_menu_link: ( color ) => `
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li > a,
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li > a.is-mega-menu-heading {
+			color: ${ color } !important;
+		}
+
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li > a + .dropdown-symbol svg {
+			fill: ${ color } !important;
+		}
+	`,
+
+	petshop_mega_menu_link_hover: ( color ) => `
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li:hover > a,
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li:hover > a.is-mega-menu-heading {
+			color: ${ color } !important;
+		}
+
+		.botiga-mega-menu > .sub-menu > li > .sub-menu > li:hover > a + .dropdown-symbol svg {
+			fill: ${ color } !important;
+		}
+	`,
+
+	petshop_mega_menu_heading_divider: ( color ) => `
+		.botiga-mega-menu .botiga-mega-menu-link.has-mega-menu-heading-divider {
+			border-bottom-color: ${ color } !important;
+		}
+	`,
+
+	main_header_submenu_background: ( color ) => `
+		.bhfb .main-navigation .sub-menu.botiga-dropdown-ul,
+		.sticky-header-active .bhfb .main-navigation .sub-menu.botiga-dropdown-ul,
+		.bhfb .sub-menu.botiga-dropdown-ul li.botiga-dropdown-li,
+		.sticky-header-active .bhfb .sub-menu.botiga-dropdown-ul li.botiga-dropdown-li {
+			background-color: ${ color } !important;
 		}
 	`,
 
@@ -712,8 +912,7 @@ export const botigaNonVariableBackedRuleMap = {
 	button_background: ( color ) => `
 		button:not(.has-background),
 		a.button:not(.has-background),
-		.wp-block-button .wp-block-button__link:not(.has-background),
-		.wp-block-button__link:not(.has-background),
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link:not(.has-background),
 		.wp-block-search .wp-block-search__button:not(.has-background),
 		input[type="button"]:not(.has-background),
 		input[type="reset"]:not(.has-background),
@@ -722,9 +921,9 @@ export const botigaNonVariableBackedRuleMap = {
 		.botiga-sc-product-quantity {
 			background-color: ${ color } !important;
 		}
-		button,a.button,
-		.wp-block-button .wp-block-button__link,
-		.wp-block-button__link,
+		button,
+		a.button,
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link,
 		input[type="button"],
 		input[type="reset"],
 		input[type="submit"] {
@@ -733,11 +932,9 @@ export const botigaNonVariableBackedRuleMap = {
 	`,
 
 	button_background_hover: ( color ) => `
-		.is-style-outline .wp-block-button__link:not(.has-background):hover,
 		button:not(.has-background):hover,
 		a.button:not(.has-background):hover,
-		.wp-block-button .wp-block-button__link:not(.has-background):hover,
-		.wp-block-button__link:not(.has-background):hover,
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link:not(.has-background):hover,
 		.wp-block-search .wp-block-search__button:not(.has-background):hover,
 		input[type="button"]:not(.has-background):hover,
 		input[type="reset"]:not(.has-background):hover,
@@ -747,8 +944,7 @@ export const botigaNonVariableBackedRuleMap = {
 		}
 		button:hover,
 		a.button:hover,
-		.wp-block-button .wp-block-button__link:hover,
-		.wp-block-button__link:hover,
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link:hover,
 		input[type="button"]:hover,
 		input[type="reset"]:hover,
 		input[type="submit"]:hover {
@@ -757,13 +953,11 @@ export const botigaNonVariableBackedRuleMap = {
 	`,
 
 	button_text: ( color ) => `
-		.wp-block-button.is-style-outline .wp-block-button__link:not(.has-text-color),
 		button:not(.has-text-color),
 		a.button:not(.wc-forward):not(.has-text-color),
 		a.button.checkout:not(.has-text-color),
 		.checkout-button.button:not(.has-text-color),
-		.wp-block-button .wp-block-button__link:not(.has-text-color),
-		.wp-block-button__link:not(.has-text-color),
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link:not(.has-text-color),
 		input[type="button"]:not(.has-text-color),
 		input[type="reset"]:not(.has-text-color),
 		input[type="submit"]:not(.has-text-color),
@@ -784,13 +978,11 @@ export const botigaNonVariableBackedRuleMap = {
 	`,
 
 	button_text_hover: ( color ) => `
-		.is-style-outline .wp-block-button__link:not(.has-text-color):hover,
-		button:hover,
+		button:not(.has-text-color):hover,
 		a.button:not(.wc-forward):not(.has-text-color):hover,
 		a.button.checkout:not(.has-text-color):hover,
 		.checkout-button.button:not(.has-text-color):hover,
-		.wp-block-button .wp-block-button__link:not(.has-text-color):hover,
-		.wp-block-button__link:not(.has-text-color):hover,
+		.wp-block-button:not(.is-style-outline) .wp-block-button__link:not(.has-text-color):hover,
 		input[type="button"]:not(.has-text-color):hover,
 		input[type="reset"]:not(.has-text-color):hover,
 		input[type="submit"]:not(.has-text-color):hover,
@@ -805,9 +997,9 @@ export const botigaNonVariableBackedRuleMap = {
 		ul.wc-block-grid__products li.product .wp-block-button__link:hover svg,
 		ul.products li.wc-block-grid__product .wp-block-button__link:hover svg,
 		ul.products li.product .button:hover svg {
-		    fill: ${ color } !important;
+			fill: ${ color } !important;
 		}
-	`
+	`,
 };
 
 /**
@@ -825,10 +1017,11 @@ export const getBotigaNonVariablePaletteMap = ( colors ) => {
 		color1: colors[ '--bt-color-button-bg' ] || '',
 		color2: colors[ '--bt-color-button-bg-hover' ] || '',
 		color3: colors[ '--bt-color-post-title' ] || '',
+		color4: colors[ '--bt-color-body-text' ] || '',
 		color5: colors[ '--bt-color-forms-borders' ] || '',
 		color6: colors[ '--bt-color-content-cards-bg' ] || '',
 		color7: colors[ '--bt-color-bg' ] || '',
-		color8: colors[ '--bt-color-menu-bg' ] || colors[ '--bt-color-bg' ] || ''
+		color8: colors[ '--bt-color-menu-bg' ] || colors[ '--bt-color-bg' ] || '',
 	};
 };
 
@@ -836,12 +1029,14 @@ export const getBotigaNonVariablePaletteMap = ( colors ) => {
  * Build Botiga non-variable-backed CSS from a colors object.
  *
  * @param {Object} colors Scheme colors object.
+ * @param {string} siteId Selected starter site ID.
  * @return {string} Generated CSS string.
  */
-export const buildBotigaNonVariableCss = ( colors ) => {
+export const buildBotigaNonVariableCss = ( colors, siteId = '' ) => {
 	const paletteMap = getBotigaNonVariablePaletteMap( colors );
+	const controlsByGroup = getBotigaNonVariableBackedColorControlsByGroup( siteId );
 
-	return Object.entries( botigaNonVariableBackedColorControlsByGroup )
+	return Object.entries( controlsByGroup )
 		.flatMap( ( [ groupName, controls ] ) => {
 			const color = paletteMap[ groupName ];
 
@@ -902,24 +1097,17 @@ export const buildBotigaScopedVariableOverrideCss = ( colors ) => {
 		'--bt-color-bg',
 		'--bt-color-button',
 		'--bt-color-button-hover',
-		'--bt-color-forms-background'
+		'--bt-color-forms-background',
 	];
 
-	const singleVars = [
-		'--bt-color-post-title'
-	];
+	const singleVars = [ '--bt-color-post-title' ];
 
-	const blogVars = [
-		'--bt-color-loop-post-meta',
-		'--bt-color-loop-post-title'
-	];
+	const blogVars = [ '--bt-color-loop-post-meta', '--bt-color-loop-post-title' ];
 
 	const buildVarBlock = ( selector, vars ) => {
 		const lines = vars
 			.filter( ( property ) => colors[ property ] )
-			.map(
-				( property ) => `\t${ property }: ${ colors[ property ] } !important;`
-			);
+			.map( ( property ) => `\t${ property }: ${ colors[ property ] } !important;` );
 
 		if ( 0 === lines.length ) {
 			return '';
@@ -931,7 +1119,7 @@ export const buildBotigaScopedVariableOverrideCss = ( colors ) => {
 	return [
 		buildVarBlock( 'body', bodyVars ),
 		buildVarBlock( '.single', singleVars ),
-		buildVarBlock( '.blog', blogVars )
+		buildVarBlock( '.blog', blogVars ),
 	]
 		.filter( Boolean )
 		.join( '\n\n' );

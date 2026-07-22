@@ -68,9 +68,17 @@ const getBotigaAvailablePlugins = (
 	selectedBuilder = 'gutenberg'
 ) => {
 	const builderSlug = getBuilderSlug( selectedBuilder );
+	const demoPluginSlugs = demoPlugins.map( ( plugin ) => plugin.slug );
 
 	const orderedBotigaSlugs = Object.keys( botigaPluginInfo ).reduce(
 		( slugs, slug ) => {
+			if (
+				botigaPluginInfo[ slug ]?.demoSpecific === true &&
+				! demoPluginSlugs.includes( slug )
+			) {
+				return slugs;
+			}
+
 			if ( slug === 'gutenberg' || slug === 'elementor' ) {
 				if ( ! slugs.includes( builderSlug ) ) {
 					slugs.push( builderSlug );

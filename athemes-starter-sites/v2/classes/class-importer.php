@@ -1419,7 +1419,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Action hook.
 		 */
-		do_action( 'atss_finish_import', $demo_id, $custom_import_settings ?? array() );
+		do_action( 'atss_finish_import', $demo_id, array(), $builder_type );
 
 		/**
 		 * Reset wizard state after successful import.
@@ -2194,7 +2194,7 @@ class Athemes_Starter_Sites_Importer {
 			update_option( 'woocommerce_queue_flush_rewrite_rules', 'yes' );
 		}
 
-		do_action( 'atss_finish_import', $demo_id, array() );
+		do_action( 'atss_finish_import', $demo_id, array(), $builder_type );
 
 		delete_option( 'atss_wizard_state' );
 

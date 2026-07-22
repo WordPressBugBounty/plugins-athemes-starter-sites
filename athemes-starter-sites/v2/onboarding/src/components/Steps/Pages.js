@@ -10,7 +10,7 @@ import { addQueryArgs, removeQueryArgs } from '@wordpress/url';
 import { Footer, PageCard, Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
 import { getDemoPages } from '../../utils/api';
-import { getStarterSiteById, getThemeName } from '../../data/starter-sites';
+import { getStarterSiteById, getStarterSitePreview, getThemeName } from '../../data/starter-sites';
 import { getColorSchemesForSite } from '../../data/color-schemes';
 import { getTypographyPairsForSite } from '../../data/typography-pairs';
 import { addPreconnectHints } from '../../utils/preload-helpers';
@@ -65,53 +65,66 @@ const transformColors = ( schemeId, colorSchemes, customColors ) => {
 /**
  * Normalize Botiga demo URL to use the correct preview base.
  *
- * Some demo page URLs returned from the API may point to an incorrect
- * base path, such as `/apparel/` instead of `/botiga-apparel/`.
- * This helper replaces the base with the selected site's preview URL
- * while preserving the rest of the path and query parameters.
- *
  * @param {string} url          Original page URL.
  * @param {Object} selectedSite Selected site object.
+ * @param {string} builder      Active builder.
  * @return {string} Normalized demo URL.
  */
-const normalizeBotigaDemoUrl = ( url, selectedSite ) => {
-	if ( ! isBotiga || ! selectedSite?.preview || ! url ) {
+const normalizeBotigaDemoUrl = (
+	url,
+	selectedSite,
+	builder
+) => {
+	const previewBase = getStarterSitePreview(
+		selectedSite,
+		builder
+	);
+
+	if ( ! isBotiga || ! previewBase || ! url ) {
 		return url;
 	}
 
 	return url.replace(
 		/^https:\/\/demo\.athemes\.com\/[^/]+\//,
-		selectedSite.preview
+		previewBase
 	);
 };
 
 /**
  * Build a stable Botiga Elementor preview URL.
  *
- * Elementor demo page URLs may contain stale `page_id` query args from the XML export.
- * This helper rebuilds the preview URL from the selected site's preview base and the page slug.
- *
  * @param {Object} page         Current page object.
  * @param {Object} selectedSite Selected site object.
  * @param {string} builder      Active builder.
  * @return {string} Normalized preview URL.
  */
-const normalizeBotigaElementorPreviewUrl = ( page, selectedSite, builder ) => {
+const normalizeBotigaElementorPreviewUrl = (
+	page,
+	selectedSite,
+	builder
+) => {
+	const previewBase = getStarterSitePreview(
+		selectedSite,
+		builder
+	);
+
 	if (
 		! isBotiga ||
 		builder !== 'elementor' ||
-		! selectedSite?.preview ||
+		! previewBase ||
 		! page?.url
 	) {
 		return page?.url || '';
 	}
 
-	const normalizedBase = selectedSite.preview.endsWith( '/' )
-		? selectedSite.preview
-		: `${ selectedSite.preview }/`;
+	const normalizedBase = previewBase.endsWith( '/' )
+		? previewBase
+		: `${ previewBase }/`;
 
-	const pageTitle = page.title?.trim()?.toLowerCase() || '';
-	const pageSlug = page.slug?.trim()?.toLowerCase() || '';
+	const pageTitle =
+		page.title?.trim()?.toLowerCase() || '';
+	const pageSlug =
+		page.slug?.trim()?.toLowerCase() || '';
 
 	if (
 		pageTitle === 'home' ||
@@ -129,22 +142,15 @@ const normalizeBotigaElementorPreviewUrl = ( page, selectedSite, builder ) => {
 	return `${ normalizedBase }${ pageSlug }/`;
 };
 
-/**
- * Get the effective preview URL for the current page.
- *
- * Keeps existing behavior intact for non-Botiga themes and Gutenberg,
- * while normalizing Botiga Elementor preview URLs.
- *
- * @param {Object} page         Current page object.
- * @param {Object} selectedSite Selected site object.
- * @param {string} builder      Active builder.
- * @return {string} Preview URL.
- */
 const getPreviewUrl = ( page, selectedSite, builder ) =>
 	normalizeBotigaElementorPreviewUrl(
 		{
 			...page,
-			url: normalizeBotigaDemoUrl( page?.url, selectedSite ),
+			url: normalizeBotigaDemoUrl(
+				page?.url,
+				selectedSite,
+				builder
+			),
 		},
 		selectedSite,
 		builder
@@ -452,7 +458,7 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 			return;
 		}
 
-		const nonVariableCss = buildBotigaNonVariableCss( colors );
+		const nonVariableCss = buildBotigaNonVariableCss( colors, selectedSiteId );
 		const scopedVariableCss =
 			buildBotigaScopedVariableOverrideCss( colors );
 
@@ -473,6 +479,7 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 		customizeData.selectedColorScheme,
 		customizeData.customColors,
 		colorSchemes,
+		selectedSiteId
 	] );
 
 	const addPreviewQueryArgs = ( url ) => {
