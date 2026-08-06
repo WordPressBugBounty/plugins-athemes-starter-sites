@@ -9,12 +9,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
+// The trait must exist before the class body is parsed, whichever include order got us here.
+require_once ATSS_PATH . 'v2/classes/trait-json-output-guard.php';
+
 if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 
 	/**
 	 * Handles onboarding metrics events.
 	 */
 	class ATSS_Onboarding_Metrics {
+
+		use ATSS_Json_Output_Guard;
 
 		/**
 		 * AJAX action name.
@@ -44,6 +49,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 			$session_id = isset( $_POST['session_id'] ) ? sanitize_text_field( wp_unslash( $_POST['session_id'] ) ) : '';
 
 			if ( ! $this->is_allowed_event( $event_name ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_success(
 					array(
 						'status' => 'ignored',
@@ -64,6 +71,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 
 			$status = $this->send_event( $payload );
 
+			$this->discard_stray_output();
+
 			wp_send_json_success(
 				array(
 					'status' => $status,
@@ -78,12 +87,16 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 		 */
 		private function verify_request() {
 			if ( ! current_user_can( 'manage_options' ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Insufficient permissions.', 'athemes-starter-sites' ), 403 );
 			}
 
 			$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 
 			if ( ! wp_verify_nonce( $nonce, 'atss_onboarding_nonce' ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ), 403 );
 			}
 		}
@@ -150,6 +163,9 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 				'optin_checked',
 				'import_step',
 				'error_code',
+				'error_message',
+				'http_status',
+				'plugin_slug',
 			);
 
 			$sanitized_metadata = array();
@@ -169,7 +185,18 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 
 					case 'selected_pages_count':
 					case 'selected_plugins_count':
+					case 'http_status':
 						$sanitized_metadata[ $key ] = absint( $value );
+						break;
+
+					case 'error_message':
+						// Redact URLs and filesystem paths here rather than relying on
+						// the client having run metrics.js's sanitizeMetadata first:
+						// error_message is forwarded off-site by send_event().
+						$value                      = preg_replace( '#https?://\S+#i', '[url]', (string) $value );
+						$value                      = preg_replace( '#(?:[A-Za-z]:)?[\\\\/](?:[\w .@~-]+[\\\\/]){2,}[\w .@-]*#', '[path]', (string) $value );
+						$value                      = sanitize_text_field( $value );
+						$sanitized_metadata[ $key ] = function_exists( 'mb_substr' ) ? mb_substr( $value, 0, 300 ) : substr( $value, 0, 300 );
 						break;
 
 					default:

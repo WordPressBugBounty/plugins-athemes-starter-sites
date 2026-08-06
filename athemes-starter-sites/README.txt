@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 7.0
 Requires PHP: 5.4
-Stable tag: 1.4.1
+Stable tag: 1.4.2
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,15 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+= 1.4.2 =
+* Added - Two new Sydney starter sites: Law Firm and Venue, with Gutenberg and Elementor support.
+* Added - Programmatic imports through the Abilities API now require an explicit confirmation flag.
+* Fixed - Headless starter-site imports now install and activate the required page builder plugin.
+* Fixed - The Elementor Container experiment is enabled automatically for Elementor imports.
+* Fixed - Plugin install timeouts are now bounded and retried independently instead of stalling the import.
+* Fixed - Plugin and page toggles in the wizard are now correctly exposed to assistive technology.
+* Security - Tightened capability checks on the Abilities import and on all atss_* AJAX endpoints.
+
 = 1.4.1 =
 * Added - New Botiga Pet Shop starter site with Gutenberg and Elementor support.
 

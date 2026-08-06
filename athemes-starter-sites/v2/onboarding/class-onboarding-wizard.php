@@ -9,6 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
+// The trait must exist before the class body is parsed, whichever include order got us here.
+require_once ATSS_PATH . 'v2/classes/trait-json-output-guard.php';
+
 if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 	/**
@@ -17,6 +20,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	 * Coordinates page registration and asset enqueueing for the wizard.
 	 */
 	class ATSS_Onboarding_Wizard {
+
+		use ATSS_Json_Output_Guard;
 
 		/**
 		 * Page slug used for the wizard screen.
@@ -121,12 +126,16 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		private function verify_ajax_request() {
 			// Check user capabilities.
 			if ( ! current_user_can( 'manage_options' ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Insufficient permissions.', 'athemes-starter-sites' ), 403 );
 			}
 
 			// Verify nonce (accept both legacy and onboarding nonces).
 			$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
 			if ( ! wp_verify_nonce( $nonce, 'atss_onboarding_nonce' ) && ! wp_verify_nonce( $nonce, 'atss_legacy_import' ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ), 403 );
 			}
 		}
@@ -148,6 +157,7 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			add_action( 'wp_ajax_atss_get_demo_pages', array( $this, 'ajax_get_demo_pages' ) );
 			add_action( 'wp_ajax_atss_apply_wizard_customizations', array( $this, 'ajax_apply_customizations' ) );
 			add_action( 'wp_ajax_atss_init_wizard_from_legacy', array( $this, 'ajax_init_wizard_from_legacy' ) );
+			add_action( 'wp_ajax_atss_import_ping', array( $this, 'ajax_import_ping' ) );
 
 			// Initialize page filter when import starts (filters pages based on wizard selection).
 			add_action( 'atss_import_start', array( $this, 'init_page_filter' ) );
@@ -181,6 +191,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			// Get wizard state from options.
 			$wizard_state = $this->state_manager->get_state();
 
+			$this->discard_stray_output();
+
 			wp_send_json_success( $wizard_state );
 		}
 
@@ -195,10 +207,14 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 			// Get state from request.
 			if ( ! isset( $_POST['state'] ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Missing state data.', 'athemes-starter-sites' ), 400 );
 			}
 
 			if ( ! isset( $_POST['state'] ) || ! is_string( $_POST['state'] ) ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Missing or invalid state data.', 'athemes-starter-sites' ), 400 );
 			}
 
@@ -207,11 +223,15 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 			$state = json_decode( $state_json, true );
 
 			if ( json_last_error() !== JSON_ERROR_NONE ) {
+				$this->discard_stray_output();
+
 				wp_send_json_error( esc_html__( 'Invalid JSON data.', 'athemes-starter-sites' ), 400 );
 			}
 
 			// Save state.
 			$result = $this->state_manager->save_state( $state );
+
+			$this->discard_stray_output();
 
 			if ( $result ) {
 				wp_send_json_success();
@@ -231,11 +251,34 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		$result = $this->state_manager->delete_state();
 
+		$this->discard_stray_output();
+
 		if ( $result ) {
 			wp_send_json_success();
 		} else {
 			wp_send_json_error( esc_html__( 'Failed to delete wizard state.', 'athemes-starter-sites' ) );
 		}
+	}
+
+	/**
+	 * Sacrificial ping used to absorb one-shot plugin activation redirects.
+	 *
+	 * Some plugins (e.g. WPConsent) arm a one-shot admin_init redirect on
+	 * activation and `exit;` without checking wp_doing_ajax(), which would
+	 * otherwise truncate the next real atss_* import request. This endpoint
+	 * exists purely to be that next request: it does nothing but confirm the
+	 * request round-tripped, letting the JS caller retry until one comes back
+	 * clean before moving on to the real import step.
+	 *
+	 * @since 1.0.0
+	 * @return void Outputs JSON response and terminates.
+	 */
+	public function ajax_import_ping() {
+		$this->verify_ajax_request();
+
+		$this->discard_stray_output();
+
+		wp_send_json_success( array( 'pong' => true ) );
 	}
 
 	/**
@@ -249,11 +292,15 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		// Validate demo_id parameter.
 		if ( ! isset( $_POST['demo_id'] ) || empty( $_POST['demo_id'] ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( esc_html__( 'Missing demo ID.', 'athemes-starter-sites' ), 400 );
 		}
 
 		// Validate builder parameter.
 		if ( ! isset( $_POST['builder'] ) || empty( $_POST['builder'] ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( esc_html__( 'Missing builder type.', 'athemes-starter-sites' ), 400 );
 		}
 
@@ -262,14 +309,18 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		// Validate builder is one of the allowed values.
 		if ( ! in_array( $builder, array( 'gutenberg', 'elementor' ), true ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ), 400 );
 		}
 
 		// Parse demo pages.
 		$pages = $this->parse_demo_pages( $demo_id, $builder );
 
+		$this->discard_stray_output();
+
 		if ( is_wp_error( $pages ) ) {
-			wp_send_json_error( $pages->get_error_message(), 500 );
+			wp_send_json_error( esc_html( $pages->get_error_message() ), 500 );
 		}
 
 		wp_send_json_success( $pages );
@@ -286,10 +337,15 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	public function ajax_apply_customizations() {
 		$this->verify_ajax_request();
 
+		// Keep the response valid JSON even if a hook prints notices.
+		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed, WordPress.PHP.NoSilencedErrors.Discouraged
+		ob_start();
+
 		// Get wizard state.
 		$state = $this->state_manager->get_state();
 
 		if ( empty( $state ) || ! isset( $state['data'] ) ) {
+			$this->discard_stray_output();
 			wp_send_json_error( esc_html__( 'No wizard state found.', 'athemes-starter-sites' ), 400 );
 		}
 
@@ -299,6 +355,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		// Apply customizations via handler.
 		$site_title = isset( $data['siteTitle'] ) ? $data['siteTitle'] : '';
 		$this->customization_handler->apply_customizations( $customize_data, $site_title, $state );
+
+		$this->discard_stray_output();
 
 		wp_send_json_success( array( 'message' => __( 'Customizations applied successfully.', 'athemes-starter-sites' ) ) );
 	}
@@ -315,11 +373,15 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	public function ajax_init_wizard_from_legacy() {
 		// Verify nonce (accept legacy nonce since called from legacy context).
 		if ( ! check_ajax_referer( 'atss_legacy_import', 'nonce', false ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( array( 'message' => __( 'Invalid security token.', 'athemes-starter-sites' ) ) );
 		}
 
 		// Check capability.
 		if ( ! current_user_can( 'manage_options' ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( array( 'message' => __( 'Insufficient permissions.', 'athemes-starter-sites' ) ) );
 		}
 
@@ -328,11 +390,15 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		$builder = isset( $_POST['builder'] ) ? sanitize_text_field( wp_unslash( $_POST['builder'] ) ) : '';
 
 		if ( empty( $demo_id ) || empty( $builder ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( array( 'message' => __( 'Missing demo ID or builder selection.', 'athemes-starter-sites' ) ) );
 		}
 
 		// Validate builder value.
 		if ( ! in_array( $builder, array( 'elementor', 'gutenberg' ), true ) ) {
+			$this->discard_stray_output();
+
 			wp_send_json_error( array( 'message' => __( 'Invalid builder type.', 'athemes-starter-sites' ) ) );
 		}
 
@@ -368,6 +434,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 
 		// Save state using state manager.
 		$saved = $this->state_manager->save_state( $wizard_state );
+
+		$this->discard_stray_output();
 
 		if ( $saved ) {
 			wp_send_json_success(

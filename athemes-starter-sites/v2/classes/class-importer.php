@@ -10,10 +10,15 @@ if ( ! defined( 'ABSPATH' ) ) {
   exit; // Exit if accessed directly.
 }
 
+// The trait must exist before the class body is parsed, whichever include order got us here.
+require_once ATSS_PATH . 'v2/classes/trait-json-output-guard.php';
+
 /**
  * Importer Class
  */
 class Athemes_Starter_Sites_Importer {
+
+	use ATSS_Json_Output_Guard;
 
 	/**
 	 * The demos of page.
@@ -63,6 +68,40 @@ class Athemes_Starter_Sites_Importer {
 	}
 
 	/**
+	 * Send a JSON response after discarding any buffered stray output, so
+	 * PHP notices/warnings printed during the import cannot corrupt the body.
+	 *
+	 * @param bool  $success Whether the request succeeded.
+	 * @param mixed $data    Response payload (keep it a string for errors —
+	 *                       the legacy demos page renders it directly).
+	 */
+	private function send_json( $success, $data = null ) {
+
+		$this->discard_stray_output();
+
+		if ( $success ) {
+			wp_send_json_success( $data );
+		} else {
+			wp_send_json_error( $data );
+		}
+
+	}
+
+	/**
+	 * Send a raw (non success/error wrapped) JSON response after discarding
+	 * any buffered stray output. Used by the newAJAX split response.
+	 *
+	 * @param mixed $response Full response array.
+	 */
+	private function send_json_raw( $response ) {
+
+		$this->discard_stray_output();
+
+		wp_send_json( $response );
+
+	}
+
+	/**
 	 * Verify import nonce - accepts both legacy (atss_legacy_import) and onboarding wizard nonces.
 	 *
 	 * @return void Sends JSON error and dies if nonce is invalid.
@@ -80,7 +119,7 @@ class Athemes_Starter_Sites_Importer {
 			return;
 		}
 
-		wp_send_json_error( esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ) );
+		$this->send_json( false, esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ) );
 	}
 
 	/**
@@ -101,11 +140,54 @@ class Athemes_Starter_Sites_Importer {
 		add_action( 'wp_ajax_atss_import_customizer', array( $this, 'ajax_import_customizer' ) );
 		add_action( 'wp_ajax_atss_import_finish', array( $this, 'ajax_import_finish' ) );
 
-		// Hide wpdb errors for avoid wp_send_json brokens.
-		if ( isset( $_POST['action'] ) && $_POST['action'] === 'atss_import_plugin' && ( WP_DEBUG || WP_DEBUG_DISPLAY ) ) {
+		// Keep atss_* AJAX responses valid JSON: silence error display and
+		// buffer any stray output (PHP notices/warnings, upgrader HTML) so it
+		// can be discarded before the JSON body is sent. See send_json().
+		//
+		// A plugin installed by an earlier import step can hijack any later
+		// AJAX request, not just the next import step, so every atss_* action
+		// is gated. Such redirects fire from init as well as admin_init:
+		// Charitable's one-shot upgrade routine runs on init, redirects to the
+		// dashboard and ignores the activate-multi convention. The wp_redirect
+		// filter is therefore the hard stop; activate-multi only pacifies the
+		// welcome-screen class of redirects that do honour it.
+		if ( wp_doing_ajax() && isset( $_POST['action'] ) && 0 === strpos( sanitize_key( wp_unslash( $_POST['action'] ) ), 'atss_' ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- gating output buffering only; each handler verifies its own nonce.
 			global $wpdb;
 			$wpdb->hide_errors();
+			@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed, WordPress.PHP.NoSilencedErrors.Discouraged
+			ob_start();
+
+			// Flag the request the way core flags bulk activations — the
+			// convention most welcome redirects honour.
+			$_GET['activate-multi']     = 1;
+			$_REQUEST['activate-multi'] = 1;
+
+			add_filter( 'wp_redirect', array( $this, 'block_redirect_during_import' ), PHP_INT_MAX, 2 );
 		}
+
+	}
+
+	/**
+	 * Refuse redirects issued while an atss_* AJAX request is running.
+	 *
+	 * @param string $location Redirect target.
+	 * @param int    $status   Redirect status code.
+	 * @return false Always false, so no Location header is sent.
+	 */
+	public function block_redirect_during_import( $location, $status ) {
+
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+				sprintf(
+					'aThemes Starter Sites: blocked a %1$d redirect to %2$s during AJAX action %3$s.',
+					(int) $status,
+					esc_url_raw( $location ),
+					isset( $_POST['action'] ) ? sanitize_key( wp_unslash( $_POST['action'] ) ) : '' // phpcs:ignore WordPress.Security.NonceVerification.Missing -- logging only.
+				)
+			);
+		}
+
+		return false;
 
 	}
 
@@ -176,6 +258,24 @@ class Athemes_Starter_Sites_Importer {
 	}
 
 	/**
+	 * Refresh plugin caches so a just-installed plugin is visible to
+	 * activate_plugin()/validate_plugin() within the same request.
+	 *
+	 * WP core get_plugins() serves a cached plugin list; without this,
+	 * activating right after installing intermittently fails with
+	 * no_plugin_header on hosts with long-lived PHP workers.
+	 */
+	private function refresh_plugins_cache() {
+
+		clearstatcache( true );
+
+		if ( function_exists( 'wp_clean_plugins_cache' ) ) {
+			wp_clean_plugins_cache( false );
+		}
+
+	}
+
+	/**
 	 * Install a plugin.
 	 *
 	 * @param string $plugin_slug Plugin slug.
@@ -215,6 +315,10 @@ class Athemes_Starter_Sites_Importer {
 				)
 			);
 
+			if ( is_wp_error( $api ) ) {
+				return $api;
+			}
+
 			$download_link = $api->download_link;
 		} else {
 			$download_link = $plugin_slug;
@@ -226,11 +330,11 @@ class Athemes_Starter_Sites_Importer {
 
 		$install = $upgrader->install( $download_link );
 
-		if ( false === $install ) {
-			return false;
-		} else {
-			return true;
+		if ( is_wp_error( $install ) ) {
+			return $install;
 		}
+
+		return true === $install;
 
 	}
 
@@ -248,10 +352,10 @@ class Athemes_Starter_Sites_Importer {
 		$activate = activate_plugin( $plugin_path, '', false, true );
 
 		if ( is_wp_error( $activate ) ) {
-			return false;
-		} else {
-			return true;
+			return $activate;
 		}
+
+		return true;
 
 	}
 
@@ -269,11 +373,11 @@ class Athemes_Starter_Sites_Importer {
 		$builder_type = ( isset( $_POST['builder_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['builder_type'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			wp_send_json_error( esc_html__( 'You are not permitted to start demo.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'You are not permitted to start demo.', 'athemes-starter-sites' ) );
 		}
 
 		/**
@@ -284,7 +388,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
 
 	}
 
@@ -301,11 +405,11 @@ class Athemes_Starter_Sites_Importer {
 		$demo_id = ( isset( $_POST['demo_id'] ) ) ? sanitize_text_field( wp_unslash( $_POST['demo_id'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			wp_send_json_error( esc_html__( 'You are not permitted to clean previous import.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'You are not permitted to clean previous import.', 'athemes-starter-sites' ) );
 		}
 
 		/**
@@ -369,7 +473,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
 
 	}
 
@@ -467,31 +571,38 @@ class Athemes_Starter_Sites_Importer {
 		$path    = ( isset( $_POST['path'] ) ) ? sanitize_text_field( wp_unslash( $_POST['path'] ) ) : '';
 
 		if ( empty( $slug ) ) {
-			wp_send_json_error( esc_html__( 'Unknown slug in a plugin.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Unknown slug in a plugin.', 'athemes-starter-sites' ) );
 		}
 
 		if ( empty( $path ) ) {
-			wp_send_json_error( esc_html__( 'Unknown path in a plugin.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Unknown path in a plugin.', 'athemes-starter-sites' ) );
 		}
 
 		// Require a valid demo only when a demo-based import is being used.
 		if ( ! empty( $demo_id ) && ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'install_plugins' ) ) {
-			wp_send_json_error( esc_html__( 'Insufficient permissions to install the plugin.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Insufficient permissions to install the plugin.', 'athemes-starter-sites' ) );
 		}
+
+		$install_result  = null;
+		$activate_result = null;
 
 		if ( 'not_installed' === $this->get_plugin_status( $path ) ) {
 
-			$this->install_plugin( $slug );
+			$install_result = $this->install_plugin( $slug );
 
-			$this->activate_plugin( $path );
+			$this->refresh_plugins_cache();
+
+			$activate_result = $this->activate_plugin( $path );
 
 		} elseif ( 'inactive' === $this->get_plugin_status( $path ) ) {
 
-			$this->activate_plugin( $path );
+			$this->refresh_plugins_cache();
+
+			$activate_result = $this->activate_plugin( $path );
 
 		}
 
@@ -504,10 +615,29 @@ class Athemes_Starter_Sites_Importer {
 		 * Return successful AJAX.
 		 */
 		if ( 'active' === $this->get_plugin_status( $path ) ) {
-			wp_send_json_success();
+			$this->send_json( true );
 		}
 
-		wp_send_json_error( esc_html__( 'Failed to initialize or activate importer plugin.', 'athemes-starter-sites' ) );
+		$reason = '';
+
+		if ( is_wp_error( $activate_result ) ) {
+			$reason = $activate_result->get_error_code() . ' — ' . $activate_result->get_error_message();
+		} elseif ( is_wp_error( $install_result ) ) {
+			$reason = $install_result->get_error_code() . ' — ' . $install_result->get_error_message();
+		}
+
+		if ( '' !== $reason ) {
+			$this->send_json(
+				false,
+				sprintf(
+					/* translators: %s: plugin install/activation error code and message. */
+					esc_html__( 'Plugin activation failed: %s', 'athemes-starter-sites' ),
+					esc_html( $reason )
+				)
+			);
+		}
+
+		$this->send_json( false, esc_html__( 'Failed to initialize or activate importer plugin.', 'athemes-starter-sites' ) );
 
 	}
 
@@ -526,20 +656,22 @@ class Athemes_Starter_Sites_Importer {
 		$content_type = ( isset( $_POST['content_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['content_type'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['content'] ) ) {
-			wp_send_json_error( esc_html__( 'The url address of the demo content is not specified.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'The url address of the demo content is not specified.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			wp_send_json_error( esc_html__( 'You are not permitted to import contents.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'You are not permitted to import contents.', 'athemes-starter-sites' ) );
 		}
+
+		$this->maybe_enable_elementor_container_experiment( $builder_type );
 
 		$xml_file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['content'];
 
@@ -561,7 +693,7 @@ class Athemes_Starter_Sites_Importer {
 			$temp_file = download_url( $xml_file_url, $timeout_seconds );
 
 			if ( is_wp_error( $temp_file ) ) {
-				wp_send_json_error( esc_html__( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ) );
+				$this->send_json( false, esc_html__( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ) );
 			}
 
 			// Array based on $_FILE as seen in PHP file uploads.
@@ -586,7 +718,7 @@ class Athemes_Starter_Sites_Importer {
 
 			// Error when downloading XML file.
 			if ( isset( $download_response['error'] ) ) {
-				wp_send_json_error( esc_html__( 'Failed to download demo xml file.', 'athemes-starter-sites' ) );
+				$this->send_json( false, esc_html__( 'Failed to download demo xml file.', 'athemes-starter-sites' ) );
 			}
 
 			// Define the downloaded contents.xml file path.
@@ -695,11 +827,11 @@ class Athemes_Starter_Sites_Importer {
 
 		// Is error ?.
 		if ( is_wp_error( $importer ) ) {
-			wp_send_json_error( esc_html__( 'An error occurred while importing contents.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'An error occurred while importing contents.', 'athemes-starter-sites' ) );
 		}
 
 		if ( $logger->error_output ) {
-			wp_send_json_error( $logger->error_output );
+			$this->send_json( false, $logger->error_output );
 		}
 
 		/**
@@ -710,7 +842,109 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
+
+	}
+
+	/**
+	 * Make sure Elementor's "Container" experiment is active for Elementor imports.
+	 *
+	 * Every Sydney starter site is built with Elementor Containers, and Elementor
+	 * refuses to render container elements while the `container` experiment
+	 * resolves to inactive — the imported pages exist but the front end collapses
+	 * to an empty page container. Installs that *upgraded* into Elementor 3.16+
+	 * keep the shipped `inactive` default (only fresh installs get the
+	 * `new_site.default_active` treatment), so a large slice of users would need
+	 * to know to flip Elementor → Settings → Features → Containers themselves.
+	 *
+	 * User intent is respected in three ways:
+	 *
+	 * 1. Idempotent — nothing is written while the experiment already resolves to
+	 *    active, so re-runs and the chunked content-import requests are no-ops and
+	 *    an implicit "active" is never rewritten as an explicit one.
+	 * 2. An explicit opt-out (a saved `inactive`, as opposed to merely inheriting
+	 *    the inactive default) is preserved under
+	 *    `atss_elementor_container_experiment_previous` before being overridden,
+	 *    so the original choice stays recoverable.
+	 * 3. `atss_enable_elementor_container_experiment` lets a site decline the
+	 *    change entirely, and receives whether this was an explicit opt-out so a
+	 *    snippet can honour only deliberate opt-outs.
+	 *
+	 * The override itself is deliberate: importing container-based content with
+	 * the experiment off yields a blank site, which is never the outcome the user
+	 * asked for by starting an import.
+	 *
+	 * @param string $builder_type Builder slug, e.g. 'elementor' | 'gutenberg'.
+	 * @return bool Whether the experiment was switched on by this call.
+	 */
+	private function maybe_enable_elementor_container_experiment( $builder_type ) {
+
+		if ( 'elementor' !== $builder_type ) {
+			return false;
+		}
+
+		$experiments = ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->experiments ) )
+			? \Elementor\Plugin::$instance->experiments
+			: null;
+
+		// Elementor's own key builder when reachable, its documented value otherwise
+		// (the experiments manager is not instantiated when Elementor was activated
+		// earlier in this same request, after `plugins_loaded`).
+		$option_key = ( $experiments && method_exists( $experiments, 'get_feature_option_key' ) )
+			? $experiments->get_feature_option_key( 'container' )
+			: 'elementor_experiment-container';
+
+		// '' when the user never saved a state; 'default' when they chose "Default".
+		$saved_state = get_option( $option_key, '' );
+
+		// A saved 'active' is checked before the experiments manager on purpose: outside
+		// admin context Elementor does not bind its update_option_ listener, so its
+		// in-memory state can still read 'inactive' after this method wrote the option.
+		// Reading the option first keeps repeat calls (the content import runs in
+		// several chunked requests) genuine no-ops in every context.
+		if ( 'active' === $saved_state ) {
+			return false;
+		}
+
+		// Already effectively active — covers fresh installs, where the feature default
+		// is active with nothing saved at all.
+		if ( $experiments && method_exists( $experiments, 'is_feature_active' ) && $experiments->is_feature_active( 'container' ) ) {
+			return false;
+		}
+
+		$explicit_opt_out = ( 'inactive' === $saved_state );
+
+		/**
+		 * Filters whether the importer may switch Elementor's Container experiment on.
+		 *
+		 * @param bool   $enable           Whether to activate the experiment.
+		 * @param bool   $explicit_opt_out Whether the user had explicitly saved it as inactive,
+		 *                                 rather than inheriting Elementor's inactive default.
+		 * @param string $saved_state      Currently saved experiment state ('' when unsaved).
+		 */
+		if ( ! apply_filters( 'atss_enable_elementor_container_experiment', true, $explicit_opt_out, $saved_state ) ) {
+			return false;
+		}
+
+		if ( $explicit_opt_out ) {
+			update_option( 'atss_elementor_container_experiment_previous', $saved_state, false );
+		}
+
+		// Writing the option is what persists the change; Elementor's own
+		// add_option_/update_option_ handlers pick it up and clear its CSS cache.
+		update_option( $option_key, 'active' );
+
+		// Keep the in-memory feature state correct for the rest of this request when
+		// those handlers are not registered (they only bind in admin context). This
+		// covers the common case of an install inheriting the inactive default; a
+		// previously *saved* 'inactive' keeps precedence over the default in memory
+		// until the next request boots from the option written above, which is
+		// harmless — the import only writes rows, it renders nothing.
+		if ( $experiments && method_exists( $experiments, 'set_feature_default_state' ) ) {
+			$experiments->set_feature_default_state( 'container', 'active' );
+		}
+
+		return true;
 
 	}
 
@@ -755,7 +989,7 @@ class Athemes_Starter_Sites_Importer {
 			);
 
 			// Send the request for a new AJAX call.
-			wp_send_json( $response );
+			$this->send_json_raw( $response );
 
 		}
 
@@ -1065,19 +1299,19 @@ class Athemes_Starter_Sites_Importer {
 		$builder_type = ( isset( $_POST['builder_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['builder_type'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['widgets'] ) ) {
-			wp_send_json_error( esc_html__( 'No widgets WIE file specified.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'No widgets WIE file specified.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			wp_send_json_error( esc_html__( 'You are not permitted to import widgets.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'You are not permitted to import widgets.', 'athemes-starter-sites' ) );
 		}
 
 		$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['widgets'];
@@ -1098,7 +1332,7 @@ class Athemes_Starter_Sites_Importer {
 		if ( is_wp_error( $raw ) ) {
 			// Log error but continue to next step
 			error_log( 'ATSS Widget Import: Failed to fetch widget file - ' . $raw->get_error_message() );
-			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
 			return;
 		}
 
@@ -1106,7 +1340,7 @@ class Athemes_Starter_Sites_Importer {
 		if ( 200 !== wp_remote_retrieve_response_code( $raw ) ) {
 			// Log error but continue to next step
 			error_log( 'ATSS Widget Import: Failed to load widget file. HTTP ' . wp_remote_retrieve_response_code( $raw ) );
-			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
 			return;
 		}
 
@@ -1127,7 +1361,7 @@ class Athemes_Starter_Sites_Importer {
 		// Check if JSON decode failed - skip if so.
 		if ( empty( $data ) ) {
 			error_log( 'ATSS Widget Import: Failed to decode widget JSON data' );
-			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) ) );
+			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) ) );
 			return;
 		}
 
@@ -1158,7 +1392,7 @@ class Athemes_Starter_Sites_Importer {
 			// Log error but continue to next step instead of stopping
 			$error_message = $results->get_error_message();
 			error_log( 'ATSS Widget Import: Widget import failed - ' . $error_message );
-			wp_send_json_success( array( 'message' => esc_html__( 'Widget import completed with errors', 'athemes-starter-sites' ) ) );
+			$this->send_json( true, array( 'message' => esc_html__( 'Widget import completed with errors', 'athemes-starter-sites' ) ) );
 			return;
 		}
 
@@ -1195,7 +1429,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
 
 		} catch ( Exception $e ) {
 			// Log the error but don't crash the import - treat widget import as optional
@@ -1207,7 +1441,7 @@ class Athemes_Starter_Sites_Importer {
 					$e->getLine()
 				)
 			);
-			wp_send_json_success( array( 'message' => esc_html__( 'Widget import skipped (unexpected error)', 'athemes-starter-sites' ) ) );
+			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (unexpected error)', 'athemes-starter-sites' ) ) );
 		}
 
 	}
@@ -1227,19 +1461,19 @@ class Athemes_Starter_Sites_Importer {
 		$builder_type = ( isset( $_POST['builder_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['builder_type'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ]['customizer'] ) ) {
-			wp_send_json_error( esc_html__( 'The url address of the demo customizer is not specified.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'The url address of the demo customizer is not specified.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
-			wp_send_json_error( esc_html__( 'You are not permitted to import customizer.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'You are not permitted to import customizer.', 'athemes-starter-sites' ) );
 		}
 
 		$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['customizer'];
@@ -1263,17 +1497,20 @@ class Athemes_Starter_Sites_Importer {
 
 		// Check if fetch failed.
 		if ( is_wp_error( $raw ) ) {
-			wp_send_json_error(
+			$this->send_json(
+				false,
 				sprintf(
+					/* translators: %s: error message. */
 					esc_html__( 'Failed to fetch customizer file: %s', 'athemes-starter-sites' ),
-					$raw->get_error_message()
+					esc_html( $raw->get_error_message() )
 				)
 			);
 		}
 
 		// Abort if customizer.json response code is not successful.
 		if ( 200 != wp_remote_retrieve_response_code( $raw ) ) {
-			wp_send_json_error(
+			$this->send_json(
+				false,
 				sprintf(
 					esc_html__( 'Failed to load customizer demo file. HTTP %d', 'athemes-starter-sites' ),
 					wp_remote_retrieve_response_code( $raw )
@@ -1289,7 +1526,7 @@ class Athemes_Starter_Sites_Importer {
 
 		// Check if data was properly unserialized
 		if ( empty( $data ) || ! is_array( $data ) ) {
-			wp_send_json_error( esc_html__( 'Failed to parse customizer data. File may be corrupted.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Failed to parse customizer data. File may be corrupted.', 'athemes-starter-sites' ) );
 		}
 
 		// Initialize contact replacer if contact data exists.
@@ -1305,10 +1542,12 @@ class Athemes_Starter_Sites_Importer {
 		$results = $customizer->import( $data );
 
 		if ( is_wp_error( $results ) ) {
-			wp_send_json_error(
+			$this->send_json(
+				false,
 				sprintf(
+					/* translators: %s: error message. */
 					esc_html__( 'Customizer import error: %s', 'athemes-starter-sites' ),
-					$results->get_error_message()
+					esc_html( $results->get_error_message() )
 				)
 			);
 		}
@@ -1321,10 +1560,11 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
 
 		} catch ( Exception $e ) {
-			wp_send_json_error(
+			$this->send_json(
+				false,
 				sprintf(
 					esc_html__( 'Customizer Import Exception: %1$s in %2$s on line %3$s', 'athemes-starter-sites' ),
 					$e->getMessage(),
@@ -1351,11 +1591,17 @@ class Athemes_Starter_Sites_Importer {
 		$content_type 	= ( isset( $_POST['content_type'] ) ) ? sanitize_text_field( wp_unslash( $_POST['content_type'] ) ) : '';
 
 		if ( ! $demo_id || ! isset( $this->demos[ $demo_id ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
 		if ( ! isset( $this->demos[ $demo_id ]['import'][ $builder_type ] ) ) {
-			wp_send_json_error( esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
+			$this->send_json( false, esc_html__( 'Invalid builder type.', 'athemes-starter-sites' ) );
+		}
+
+		// The finish step runs the demos' after-import actions, which delete and
+		// rewrite content, so it is gated like the other destructive handlers.
+		if ( ! current_user_can( 'edit_theme_options' ) ) {
+			$this->send_json( false, esc_html__( 'You are not permitted to finish the import.', 'athemes-starter-sites' ) );
 		}
 
 		/**
@@ -1430,7 +1676,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Return successful AJAX.
 		 */
-		wp_send_json_success();
+		$this->send_json( true );
 
 	}
 
@@ -1522,13 +1768,10 @@ class Athemes_Starter_Sites_Importer {
 		// 1. Start.
 		$steps['start'] = $this->run_import_start( $demo_id, $builder_type );
 
-		// 1b. Optional: clean a previous starter-site import (sync twin of the
-		// wizard's opt-in atss_import_clean step).
-		if ( ! empty( $options['clean_previous'] ) ) {
-			$steps['clean'] = $this->run_import_clean();
-		}
-
 		// 2. Required plugins (Elementor / Woo / etc. declared by the demo).
+		// Runs before the destructive clean step: a required plugin that cannot
+		// be installed or activated must abort while the previous site is still
+		// intact.
 		$steps['plugins'] = $this->run_import_plugins( $demo_id, $builder_type );
 		if ( ! $steps['plugins']['success'] ) {
 			return array(
@@ -1536,6 +1779,12 @@ class Athemes_Starter_Sites_Importer {
 				'message' => $steps['plugins']['message'],
 				'steps'   => $steps,
 			);
+		}
+
+		// 2b. Optional: clean a previous starter-site import (sync twin of the
+		// wizard's opt-in atss_import_clean step).
+		if ( ! empty( $options['clean_previous'] ) ) {
+			$steps['clean'] = $this->run_import_clean();
 		}
 
 		// 3. Contents (XML) — fatal on failure.
@@ -1649,7 +1898,9 @@ class Athemes_Starter_Sites_Importer {
 	 * of ajax_import_plugin(), looping the demo's plugin specs instead of a
 	 * single $_POST slug/path. Demo plugin specs carry name/slug/path/required
 	 * and optionally builder ('elementor'|'gutenberg'); builder-scoped entries
-	 * for the other builder are skipped. Only entries marked required => true
+	 * for the other builder are skipped. No demo declares the builder plugin
+	 * itself, so a required elementor entry is prepended when importing that
+	 * builder. Only entries marked required => true
 	 * abort the import on failure. Plugin status is read without a capability
 	 * gate; install_plugins / activate_plugins are required only when an install
 	 * or activation is actually needed, so already-active plugins import fine
@@ -1665,6 +1916,43 @@ class Athemes_Starter_Sites_Importer {
 		$plugins = isset( $this->demos[ $demo_id ]['plugins'] ) && is_array( $this->demos[ $demo_id ]['plugins'] )
 			? $this->demos[ $demo_id ]['plugins']
 			: array();
+
+		// Demo configs declare the Elementor add-on but never Elementor itself:
+		// installing the builder has always been the UI layer's job (the wizard's
+		// ensureElementorPlugin(), the legacy modal's hardcoded checkbox), so this
+		// non-AJAX path imported Elementor content onto sites without Elementor and
+		// still reported success. Prepend it — ahead of the add-ons, which expect
+		// the builder active when they load — and mark it required so a site that
+		// cannot install it fails loudly instead of returning a green result.
+		if ( 'elementor' === $builder_type ) {
+			$has_builder_plugin = false;
+
+			// Count only entries the install loop below will actually process: a
+			// pathless or other-builder-scoped 'elementor' entry would be skipped
+			// there and must not suppress the injection.
+			foreach ( $plugins as $plugin ) {
+				if (
+					isset( $plugin['slug'] ) && 'elementor' === $plugin['slug']
+					&& ! empty( $plugin['path'] )
+					&& ( empty( $plugin['builder'] ) || $builder_type === $plugin['builder'] )
+				) {
+					$has_builder_plugin = true;
+					break;
+				}
+			}
+
+			if ( ! $has_builder_plugin ) {
+				array_unshift(
+					$plugins,
+					array(
+						'name'     => 'Elementor',
+						'slug'     => 'elementor',
+						'path'     => 'elementor/elementor.php',
+						'required' => true,
+					)
+				);
+			}
+		}
 
 		if ( ! function_exists( 'is_plugin_active_for_network' ) || ! function_exists( 'activate_plugin' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -1683,6 +1971,9 @@ class Athemes_Starter_Sites_Importer {
 			if ( empty( $slug ) || empty( $path ) ) {
 				continue;
 			}
+
+			$install_result  = null;
+			$activate_result = null;
 
 			$status = $this->get_plugin_status_uncapped( $path );
 
@@ -1710,11 +2001,13 @@ class Athemes_Starter_Sites_Importer {
 					$results[ $path ] = $status;
 					continue;
 				}
-				$this->install_plugin( $slug );
-				$this->activate_plugin( $path );
+				$install_result = $this->install_plugin( $slug );
+				$this->refresh_plugins_cache();
+				$activate_result = $this->activate_plugin( $path );
 			} elseif ( 'inactive' === $status ) {
 				if ( current_user_can( 'activate_plugins' ) ) {
-					activate_plugin( $path, '', false, true );
+					$this->refresh_plugins_cache();
+					$activate_result = activate_plugin( $path, '', false, true );
 				} elseif ( ! empty( $plugin['required'] ) ) {
 					return array(
 						'success' => false,
@@ -1734,13 +2027,29 @@ class Athemes_Starter_Sites_Importer {
 
 			// A non-required plugin that won't activate must not abort the import.
 			if ( 'active' !== $final && ! empty( $plugin['required'] ) ) {
+				// Surface the underlying WP_Error (mirrors ajax_import_plugin()) so a
+				// headless caller can tell a network failure from a permissions one.
+				$reason = '';
+				if ( is_wp_error( $activate_result ) ) {
+					$reason = $activate_result->get_error_code() . ' — ' . $activate_result->get_error_message();
+				} elseif ( is_wp_error( $install_result ) ) {
+					$reason = $install_result->get_error_code() . ' — ' . $install_result->get_error_message();
+				}
+
 				return array(
 					'success' => false,
-					'message' => sprintf(
-						/* translators: %s: plugin name. */
-						__( 'Failed to install or activate the required plugin: %s', 'athemes-starter-sites' ),
-						isset( $plugin['name'] ) ? $plugin['name'] : $slug
-					),
+					'message' => '' !== $reason
+						? sprintf(
+							/* translators: 1: plugin name, 2: install/activation error code and message. */
+							__( 'Failed to install or activate the required plugin: %1$s (%2$s)', 'athemes-starter-sites' ),
+							isset( $plugin['name'] ) ? $plugin['name'] : $slug,
+							$reason
+						)
+						: sprintf(
+							/* translators: %s: plugin name. */
+							__( 'Failed to install or activate the required plugin: %s', 'athemes-starter-sites' ),
+							isset( $plugin['name'] ) ? $plugin['name'] : $slug
+						),
 					'plugins' => $results,
 				);
 			}
@@ -1797,6 +2106,8 @@ class Athemes_Starter_Sites_Importer {
 				'message' => __( 'The url address of the demo content is not specified.', 'athemes-starter-sites' ),
 			);
 		}
+
+		$this->maybe_enable_elementor_container_experiment( $builder_type );
 
 		$xml_file_url  = $this->demos[ $demo_id ]['import'][ $builder_type ]['content'];
 		$xml_file_path = get_transient( 'atss_importer_data' );

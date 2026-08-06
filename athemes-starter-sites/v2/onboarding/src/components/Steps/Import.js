@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Spinner } from '../Layout';
 import { useWizard } from '../../context/WizardContext';
-import { importAjaxRequest, deleteWizardState } from '../../utils/api';
+import { importAjaxRequest, deleteWizardState, drainActivationRedirects } from '../../utils/api';
 import Complete from '../Layout/Complete';
 import isBotiga from '../../utils/is-botiga';
 import { trackOnboardingEvent, resetOnboardingMetricsSession } from '../../utils/metrics';
@@ -300,6 +300,28 @@ function Import( { onContinue, onImportingChange } ) {
 
 		let currentStep = 0;
 
+		// Bounded retry budget for steps that fail transiently: the request timed
+		// out (AbortError), a plugin installed by an earlier step redirected the
+		// request to its own admin screen (RedirectError), stray output corrupted
+		// the JSON body (SyntaxError), or the connection dropped before any
+		// response arrived (TypeError, what fetch() rejects with per spec). All
+		// are one-shot in practice, so a single repeat of the step usually
+		// succeeds.
+		const maxTransientRetries = {
+			atss_import_contents: 2,
+			atss_import_plugin: 1,
+		};
+		const transientErrorNames = [ 'AbortError', 'RedirectError', 'SyntaxError' ];
+		const transientRetryCounts = {};
+
+		// A TypeError only counts as transient when it came from the network
+		// layer: fetch() rejects with a status-less TypeError when the request
+		// never completed. A TypeError carrying a status came out of response
+		// handling and is a code bug, which retrying cannot fix.
+		const isTransientError = ( err ) =>
+			transientErrorNames.includes( err.name ) ||
+			( 'TypeError' === err.name && undefined === err.status );
+
 		while ( currentStep < steps.length ) {
 			const step = steps[ currentStep ];
 
@@ -324,6 +346,10 @@ function Import( { onContinue, onImportingChange } ) {
 							getImportMetricsMetadata( {
 								import_step: step.action,
 								error_code: 'non_critical_import_step_failed',
+								error_message:
+									typeof response.data === 'string'
+										? response.data
+										: response.data?.message || '',
 							} )
 						);
 
@@ -340,6 +366,8 @@ function Import( { onContinue, onImportingChange } ) {
 							getImportMetricsMetadata( {
 								import_step: step.action,
 								error_code: 'plugin_installation_failed',
+								error_message: typeof response.data === 'string' ? response.data : '',
+								plugin_slug: step.slug || '',
 							} )
 						);
 
@@ -351,6 +379,18 @@ function Import( { onContinue, onImportingChange } ) {
 
 					// For other steps, show error.
 					throw new Error( response.data || __( 'Import step failed.', 'athemes-starter-sites' ) );
+				}
+
+				// A successful request resets the step's retry budget, so the bound
+				// applies to consecutive transient failures only.
+				transientRetryCounts[ currentStep ] = 0;
+
+				// A plugin that just activated may have armed a one-shot admin_init
+				// redirect (WPConsent-class onboarding). Absorb it here, outside the
+				// retry/error handling above, so it can never fail this step or
+				// consume its retry budget, and the next real step isn't truncated.
+				if ( step.action === 'atss_import_plugin' ) {
+					await drainActivationRedirects();
 				}
 
 				// Handle newAJAX response (content import needs multiple calls).
@@ -373,17 +413,58 @@ function Import( { onContinue, onImportingChange } ) {
 				// eslint-disable-next-line no-console
 				console.error( 'Import error:', err );
 
-				// For content timeout, retry once.
-				if ( step.action === 'atss_import_contents' && err.name === 'AbortError' ) {
+				const isTransient = isTransientError( err );
+
+				// Bounded transient retries for content and plugin steps.
+				if ( isTransient && maxTransientRetries[ step.action ] ) {
+					transientRetryCounts[ currentStep ] = ( transientRetryCounts[ currentStep ] || 0 ) + 1;
+
+					if ( transientRetryCounts[ currentStep ] <= maxTransientRetries[ step.action ] ) {
+						// eslint-disable-next-line no-console
+						console.log( 'Import step failed transiently, retrying...', step.action, err.name );
+						continue;
+					}
+
+					// Retries exhausted: optional steps are skipped below, contents
+					// falls through to the fatal path.
+				}
+
+				// A single optional plugin must not abort the whole import, whatever
+				// the request failed with: a plugin activated by an earlier step can
+				// fatal and answer the next request with an HTTP 500.
+				if ( step.action === 'atss_import_plugin' ) {
+					trackOnboardingEvent(
+						'onboarding_import_failed',
+						getImportMetricsMetadata( {
+							import_step: step.action,
+							error_code: 'AbortError' === err.name ? 'plugin_installation_timeout' : 'plugin_installation_request_failed',
+							error_message: err.message || '',
+							http_status: err.status || 0,
+							plugin_slug: step.slug || '',
+						} )
+					);
+
 					// eslint-disable-next-line no-console
-					console.log( 'Content import timeout, retrying...' );
+					console.warn( 'Plugin installation failed, skipping:', step.slug, err.name );
+					currentStep++;
 					continue;
 				}
 
-				// For widget timeouts, skip and continue.
-				if ( step.action === 'atss_import_widgets' && err.name === 'AbortError' ) {
+				// Widgets and the customizer are non-critical: skip them instead of
+				// aborting the whole import when the request itself failed.
+				if ( step.action === 'atss_import_widgets' || step.action === 'atss_import_customizer' ) {
+					trackOnboardingEvent(
+						'onboarding_import_failed',
+						getImportMetricsMetadata( {
+							import_step: step.action,
+							error_code: 'non_critical_import_step_failed',
+							error_message: err.message || '',
+							http_status: err.status || 0,
+						} )
+					);
+
 					// eslint-disable-next-line no-console
-					console.warn( 'Widget import timed out, skipping...' );
+					console.warn( 'Non-critical import step request failed, skipping:', step.action, err.name );
 					currentStep++;
 					continue;
 				}
@@ -393,6 +474,9 @@ function Import( { onContinue, onImportingChange } ) {
 					getImportMetricsMetadata( {
 						import_step: step.action,
 						error_code: err.name || 'import_step_failed',
+						error_message: err.message || '',
+						http_status: err.status || 0,
+						plugin_slug: step.action === 'atss_import_plugin' ? step.slug || '' : undefined,
 					} )
 				);
 
@@ -403,8 +487,15 @@ function Import( { onContinue, onImportingChange } ) {
 		}
 
 		// No-starter flow: clear wizard state (atss_import_finish handles this for starter flow).
+		// The import itself is already done by this point, so a failed cleanup
+		// must never strand the wizard short of the completion screen.
 		if ( ! demoId ) {
-			await deleteWizardState();
+			try {
+				await deleteWizardState();
+			} catch ( err ) {
+				// eslint-disable-next-line no-console
+				console.warn( 'Could not clear the wizard state after import:', err.name );
+			}
 		}
 
 		// Import complete.

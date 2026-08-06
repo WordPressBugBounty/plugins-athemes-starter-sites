@@ -176,10 +176,15 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 				'plugins'    => array_merge(
 					array(
 						array(
-							'name'     => 'Charitable',
-							'slug'     => 'charitable',
-							'path'     => 'charitable/charitable.php',
-							'required' => true,
+							// Charitable is a companion plugin, not structurally
+							// needed to import Walkathon's pages, so it stays
+							// pre-checked but remains optional.
+							'name'        => 'Charitable',
+							'slug'        => 'charitable',
+							'path'        => 'charitable/charitable.php',
+							'required'    => false,
+							'recommended' => true,
+							'isSelected'  => true,
 						),
 						array(
 							'name'     => 'aThemes Addons for Elementor Lite',
@@ -322,6 +327,30 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 					),
 				),
 			),
+			'law-firm'   => array(
+				'name'       => esc_html__( 'Law Firm', 'sydney' ),
+				'type'       => 'pro',
+				'categories' => array( 'business' ),
+				'builders'   => array(
+					'elementor',
+					'gutenberg',
+				),
+				'preview'    => 'https://demo.athemes.com/sp-law-firm/',
+				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/law-firm/thumb.jpg',
+				'plugins'    => $plugins,
+				'import'     => array(
+					'elementor'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/law-firm/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/law-firm/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/law-firm/customizer.dat',
+					),
+					'gutenberg'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/law-firm/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/law-firm/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/law-firm/customizer.dat'
+					),
+				),
+			),
 			'photography'     => array(
 				'name'       => esc_html__( 'Photography', 'sydney' ),
 				'type'       => 'free',
@@ -413,6 +442,59 @@ if ( !function_exists( 'sydney_atss_demos_list') ) {
 						'content'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/crypto/content.xml',
 						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/crypto/widgets.wie',
 						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/crypto/customizer.dat'
+					),
+				),
+			),
+			'venue'   => array(
+				'name'       => esc_html__( 'Venue', 'sydney' ),
+				'type'       => 'free',
+				'categories' => array( 'business' ),
+				'builders'   => array(
+					'elementor',
+					'gutenberg',
+				),
+				'preview'    => 'https://demo.athemes.com/sydney-venue/',
+				'thumbnail'  => 'https://athemes.com/themes-demo-content/sydney/venue/thumb.jpg',
+				'plugins'    => array_merge(
+					array(
+						array(
+							// Sugar Calendar Lite is a companion plugin for event/booking
+							// management, not structurally needed to import Venue's pages,
+							// so it stays pre-checked but remains optional.
+							'name'        => 'Sugar Calendar Lite',
+							'slug'        => 'sugar-calendar-lite',
+							'path'        => 'sugar-calendar-lite/sugar-calendar-lite.php',
+							'required'    => false,
+							'recommended' => true,
+							'isSelected'  => true,
+						),
+						array(
+							'name'     => 'aThemes Addons for Elementor Lite',
+							'slug'     => 'athemes-addons-for-elementor-lite',
+							'path'     => 'athemes-addons-for-elementor-lite/athemes-addons-elementor.php',
+							'required' => false,
+							'builder'  => 'elementor'
+						),
+						array(
+							'name'     => 'aThemes Blocks',
+							'slug'     => 'athemes-blocks',
+							'path'     => 'athemes-blocks/athemes-blocks.php',
+							'required' => false,
+							'builder'  => 'gutenberg'
+						),
+					),
+					$plugins
+				),
+				'import'     => array(
+					'elementor'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/venue/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/venue/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/venue/' . $customizer_file
+					),
+					'gutenberg'    => array(
+						'content'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/venue/content.xml',
+						'widgets'    => 'https://athemes.com/themes-demo-content/sydney/gutenberg/venue/widgets.wie',
+						'customizer' => 'https://athemes.com/themes-demo-content/sydney/gutenberg/venue/' . $customizer_file
 					),
 				),
 			),
@@ -1184,6 +1266,10 @@ function sydney_atss_setup_after_import( $demo_id ) {
 		update_option( 'athemes-addons-modules', array_merge( $aafe_modules, array( 'wpforms' => true ) ) );
 	}
 
+	if ( 'venue' === $demo_id ) {
+		sydney_atss_seed_venue_events();
+	}
+
 	// Asign the static front page and the blog page.
 	$front_page = ATSS_Core_Helpers::atss_get_page_by_title( 'My front page' ) != NULL ? ATSS_Core_Helpers::atss_get_page_by_title( 'My front page' ) : ATSS_Core_Helpers::atss_get_page_by_title( 'Home' );
 	$blog_page  = ATSS_Core_Helpers::atss_get_page_by_title( 'My blog page' ) != NULL ? ATSS_Core_Helpers::atss_get_page_by_title( 'My blog page' ) : ATSS_Core_Helpers::atss_get_page_by_title( 'Blog' );
@@ -1191,13 +1277,13 @@ function sydney_atss_setup_after_import( $demo_id ) {
 	if ( !empty( $front_page ) ) {
 		update_option( 'show_on_front', 'page' );
 		update_option( 'page_on_front', $front_page->ID );
+
+		// Assign the Front Page template.
+		update_post_meta( $front_page->ID, '_wp_page_template', 'page-templates/page_front-page.php' );
 	}
 	if ( !empty( $blog_page ) ) {
 		update_option( 'page_for_posts', $blog_page->ID );
 	}
-
-	// Assign the Front Page template.
-	update_post_meta( $front_page->ID, '_wp_page_template', 'page-templates/page_front-page.php' );
 
 	if ( class_exists( 'SmartSlider3', false ) ) {
 		SmartSlider3::import( get_template_directory() . '/demo-content/demo-slider.ss3' );
@@ -1218,6 +1304,148 @@ function sydney_atss_setup_after_import( $demo_id ) {
 	atss()->current_starter( 'sydney', $demo_id );
 }
 add_action( 'atss_finish_import', 'sydney_atss_setup_after_import' );
+
+/**
+* Create the Venue demo's Sugar Calendar events.
+*
+* Sugar Calendar 3.x keeps event dates in its own `sc_events` table, which the
+* WordPress exporter never serializes. The demo's content.xml therefore carries
+* only dateless `sc_event` post shells: absent from the calendar, reachable only
+* as bare posts. They are replaced here with real events, dated relative to the
+* import so the demo never ships a calendar full of past dates.
+*
+* The demo's event list block shows five events, so five are created.
+*/
+function sydney_atss_seed_venue_events() {
+
+	if ( ! function_exists( 'sugar_calendar_add_event' ) || ! function_exists( 'sugar_calendar_get_event_post_type_id' ) ) {
+		return;
+	}
+
+	$post_type = sugar_calendar_get_event_post_type_id();
+
+	// Remove the imported shells, plus any events a previous run created. Both
+	// carry the importer's marker meta, so nothing the user authored is touched.
+	$imported = get_posts(
+		array(
+			'post_type'      => $post_type,
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_key'       => '_athemes_sites_imported_post',
+		)
+	);
+
+	foreach ( $imported as $imported_id ) {
+		// The `sc_events` row is dropped explicitly. Sugar Calendar hooks its own
+		// cleanup to `deleted_post`, but that was observed not to run here, and a
+		// leftover row still answers the calendar's queries -- so re-importing
+		// would show ghost events pointing at posts that no longer exist.
+		if ( function_exists( 'sugar_calendar_delete_events' ) ) {
+			sugar_calendar_delete_events(
+				array(
+					'object_id'   => $imported_id,
+					'object_type' => 'post',
+				)
+			);
+		}
+
+		// Deleted rather than trashed, which would leave the event behind.
+		wp_delete_post( $imported_id, true );
+	}
+
+	// Dates float with the import: "today" is resolved in the site's timezone.
+	$today = new DateTimeImmutable( 'now', wp_timezone() );
+
+	$calendar_taxonomy = function_exists( 'sugar_calendar_get_calendar_taxonomy_id' ) ? sugar_calendar_get_calendar_taxonomy_id() : '';
+	$default_calendar  = function_exists( 'sugar_calendar_get_default_calendar' ) ? sugar_calendar_get_default_calendar() : 0;
+
+	$events = array(
+		array(
+			'title'   => 'Concrete Hours',
+			'content' => 'Ambient guitar and tape loops in the main room, doors at eight.',
+			'days'    => 6,
+			'start'   => '20:00:00',
+			'end'     => '23:00:00',
+		),
+		array(
+			'title'   => 'DJ Vera Holt',
+			'content' => 'House and disco selections, late set on the back patio.',
+			'days'    => 13,
+			'start'   => '21:00:00',
+			'end'     => '23:59:00',
+		),
+		array(
+			'title'   => 'The Sunday Quartet',
+			'content' => 'An early evening of standards, seated tables only.',
+			'days'    => 20,
+			'start'   => '18:00:00',
+			'end'     => '20:00:00',
+		),
+		array(
+			'title'   => 'South Loop Standup',
+			'content' => 'Five comics, one host, two drink minimum.',
+			'days'    => 27,
+			'start'   => '19:30:00',
+			'end'     => '21:30:00',
+		),
+		array(
+			'title'   => 'Wraith',
+			'content' => 'Post-punk headliner with support from the neighbourhood.',
+			'days'    => 34,
+			'start'   => '20:30:00',
+			'end'     => '23:00:00',
+		),
+	);
+
+	foreach ( $events as $event ) {
+		$date = $today->modify( sprintf( '+%d days', $event['days'] ) )->format( 'Y-m-d' );
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'   => $event['title'],
+				'post_content' => $event['content'],
+				'post_status'  => 'publish',
+				'post_type'    => $post_type,
+				'post_author'  => get_current_user_id(),
+			)
+		);
+
+		if ( is_wp_error( $post_id ) || empty( $post_id ) ) {
+			continue;
+		}
+
+		// Marked like an imported post so the plugin's clean-up step collects it.
+		update_post_meta( $post_id, '_athemes_sites_imported_post', true );
+
+		// Assigned explicitly rather than left to Sugar Calendar's
+		// save_post_sc_event hook, which only runs in admin requests. The term id
+		// is looked up because the demo's calendar term is remapped on import.
+		if ( $calendar_taxonomy && $default_calendar ) {
+			wp_set_object_terms( $post_id, array( (int) $default_calendar ), $calendar_taxonomy );
+		}
+
+		// `start`/`end` are wall-clock values, and the timezone is deliberately
+		// left empty -- Sugar Calendar reads that as a floating time, so an 8pm
+		// show reads as 8pm whatever the visitor's zone. That also matches how
+		// the plugin stores its own events.
+		sugar_calendar_add_event(
+			array(
+				'object_id'      => $post_id,
+				'object_type'    => 'post',
+				'object_subtype' => $post_type,
+				'title'          => $event['title'],
+				'content'        => $event['content'],
+				'status'         => 'publish',
+				'start'          => $date . ' ' . $event['start'],
+				'start_tz'       => '',
+				'end'            => $date . ' ' . $event['end'],
+				'end_tz'         => '',
+				'all_day'        => 0,
+			)
+		);
+	}
+}
 
 /*
 * Color scheme tooltips

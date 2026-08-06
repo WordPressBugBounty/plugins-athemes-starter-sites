@@ -489,7 +489,7 @@ function Pages( { onBack, onContinue, navigationLoading, navigationError } ) {
 
 		const cleanUrl = removeQueryArgs( url, [ 'atss_preview', 'cache_test' ] );
 
-		return addQueryArgs( url, {
+		return addQueryArgs( cleanUrl, {
 			atss_preview: '1',
 			cache_test: previewCacheToken.current,
 		} );

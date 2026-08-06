@@ -76,17 +76,14 @@ function FeatureCard( { plugin, isSelected = false, onToggle } ) {
 
 	const isDisabled = plugin.required === true;
 
+	// The card is a click shortcut for pointer users only. Keyboard and
+	// assistive tech operate the checkbox below, so the card itself carries no
+	// role: a role="button" wrapper around a real button nests interactive
+	// elements and hides the checkbox behind the card's accessible name.
 	return (
 		<div
 			className={ `atss-feature-card atss-feature-card--${ plugin.slug } ${ isSelected ? 'atss-feature-card--selected' : '' } ${ isDisabled ? 'atss-feature-card--disabled' : '' }` }
 			onClick={ ! isDisabled ? handleToggle : undefined }
-			role="button"
-			tabIndex={ isDisabled ? -1 : 0 }
-			onKeyDown={ ( e ) => {
-				if ( ! isDisabled && ( e.key === 'Enter' || e.key === ' ' ) ) {
-					handleToggle();
-				}
-			} }
 		>
 			<div className="atss-feature-card__content">
 				<div className="atss-feature-card__icon" dangerouslySetInnerHTML={ { __html: getPluginIcon( plugin.slug ) } } />
@@ -103,16 +100,19 @@ function FeatureCard( { plugin, isSelected = false, onToggle } ) {
 				</div>
 			</div>
 
-			<span
-				className="atss-feature-card__checkbox-wrapper"
-				aria-label={ sprintf( __( 'Install %s', 'athemes-starter-sites' ), plugin?.pillName || plugin.name ) }
-			>
+			<span className="atss-feature-card__checkbox-wrapper">
 				<button
 					type="button"
 					className={ `atss-feature-card__checkbox ${ isSelected ? 'atss-feature-card__checkbox--checked' : '' }` }
 					onClick={ handleToggle }
 					disabled={ isDisabled }
+					role="checkbox"
 					aria-checked={ isSelected }
+					aria-label={ sprintf(
+						/* translators: %s: plugin name. */
+						__( 'Install %s', 'athemes-starter-sites' ),
+						plugin?.pillName || getPluginName( plugin )
+					) }
 				>
 					{ isSelected && (
 						<svg

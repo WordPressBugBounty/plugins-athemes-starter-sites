@@ -97,8 +97,10 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 					'description'         => __( 'List the available aThemes starter sites with their builders and preview details.', 'athemes-starter-sites' ),
 					'category'            => self::CATEGORY,
 					'input_schema'        => array(
-						'type'       => 'object',
-						'properties' => new stdClass(),
+						'type'                 => 'object',
+						'default'              => array(),
+						'properties'           => array(),
+						'additionalProperties' => false,
 					),
 					'output_schema'       => array(
 						'type'       => 'object',
@@ -164,7 +166,7 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 					'category'            => self::CATEGORY,
 					'input_schema'        => array(
 						'type'       => 'object',
-						'required'   => array( 'demo_id', 'builder_type' ),
+						'required'   => array( 'demo_id', 'builder_type', 'confirm' ),
 						'properties' => array(
 							'demo_id'      => array(
 								'type'        => 'string',
@@ -173,6 +175,10 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 							'builder_type' => array(
 								'type'        => 'string',
 								'description' => 'Builder to import, must be one of the demo\'s builders, e.g. "elementor" or "gutenberg".',
+							),
+							'confirm'      => array(
+								'type'        => 'boolean',
+								'description' => 'Must be true to confirm the destructive starter-site import.',
 							),
 							'clean_previous' => array(
 								'type'        => 'boolean',
@@ -214,7 +220,7 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 						),
 					),
 					'execute_callback'    => array( __CLASS__, 'execute_import_site' ),
-					'permission_callback' => array( __CLASS__, 'check_permission' ),
+					'permission_callback' => array( __CLASS__, 'check_import_permission' ),
 					'meta'                => array(
 						'show_in_rest' => true,
 						'annotations'  => array(
@@ -238,6 +244,18 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 		 */
 		public static function check_permission() {
 			return current_user_can( 'edit_theme_options' );
+		}
+
+		/**
+		 * Checks whether the current user can run a starter site import.
+		 *
+		 * Importing may install and activate required plugins, so this uses a
+		 * stronger permission floor than the read-only Starter Sites ability.
+		 *
+		 * @return bool
+		 */
+		public static function check_import_permission() {
+			return current_user_can( 'edit_theme_options' ) && current_user_can( 'install_plugins' );
 		}
 
 		/**
@@ -292,10 +310,32 @@ if ( ! class_exists( 'Athemes_Starter_Sites_Abilities' ) ) {
 		 * execute: import-site. Validates demo_id + builder_type against the
 		 * demo's own builders, then runs the synchronous import orchestration.
 		 *
-		 * @param array $input { @type string $demo_id, @type string $builder_type }.
+		 * @param array $input {
+		 *		Import arguments.
+		 *
+		 *		@type string $demo_id      Starter site ID.
+		 *		@type string $builder_type Builder to import.
+		 *		@type bool   $confirm      Whether the import was explicitly confirmed.
+		 *	}.
 		 * @return array { success, message, data?: { steps } }
 		 */
 		public static function execute_import_site( $input = array() ) {
+
+			if (
+				! isset( $input['confirm'] ) ||
+				true !== $input['confirm']
+			) {
+				return new WP_Error(
+					'atss_import_confirmation_required',
+					__(
+						'Starter site import requires explicit confirmation.',
+						'athemes-starter-sites'
+					),
+					array(
+						'status' => 400,
+					)
+				);
+			}
 
 			$demo_id      = isset( $input['demo_id'] ) ? sanitize_text_field( (string) $input['demo_id'] ) : '';
 			$builder_type = isset( $input['builder_type'] ) ? sanitize_text_field( (string) $input['builder_type'] ) : '';

@@ -28,7 +28,9 @@ function PageCard( { id, title, url, thumbnail, isSelected = false, onToggle, on
 	const [ hasIframeError, setHasIframeError ] = useState( false );
 	const [ isIframeLoading, setIsIframeLoading ] = useState( true );
 
-	// Process URL for front page/home - remove page_id query parameter and add atss_preview=1
+	// Process URL for front page/home - remove the page_id query parameter so the
+	// front page renders as itself. Preview query args (atss_preview, cache_test)
+	// are already added upstream by the Pages step.
 	const processedUrl = useMemo( () => {
 		if ( ! url ) {
 			return url;
@@ -123,6 +125,7 @@ function PageCard( { id, title, url, thumbnail, isSelected = false, onToggle, on
 					type="button"
 					className={ `atss-page-card__checkbox ${ isSelected ? 'atss-page-card__checkbox--checked' : '' }` }
 					onClick={ handleToggle }
+					role="checkbox"
 					aria-checked={ isSelected }
 					aria-label={ isSelected ? __( 'Deselect page', 'athemes-starter-sites' ) : __( 'Select page', 'athemes-starter-sites' ) }
 				>

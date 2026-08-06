@@ -33,7 +33,12 @@ const allowedMetadataKeys = [
 	'optin_checked',
 	'import_step',
 	'error_code',
+	'error_message',
+	'http_status',
+	'plugin_slug',
 ];
+
+const MAX_ERROR_MESSAGE_LENGTH = 200;
 
 const sessionStorageKey = 'atss_onboarding_session_id';
 
@@ -125,7 +130,19 @@ const sanitizeMetadata = ( metadata = {} ) => {
 			return sanitizedMetadata;
 		}
 
-		sanitizedMetadata[ key ] = metadata[ key ];
+		let value = metadata[ key ];
+
+		// Keep error text privacy-safe: no URLs, bounded length.
+		if ( 'error_message' === key ) {
+			value = String( value )
+				.replace( /https?:\/\/\S+/gi, '[url]' )
+				.replace( /(?:[A-Za-z]:)?[\\/](?:[\w .@~-]+[\\/]){2,}[\w .@-]*/g, '[path]' )
+				.replace( /\s+/g, ' ' )
+				.trim()
+				.slice( 0, MAX_ERROR_MESSAGE_LENGTH );
+		}
+
+		sanitizedMetadata[ key ] = value;
 
 		return sanitizedMetadata;
 	}, {} );

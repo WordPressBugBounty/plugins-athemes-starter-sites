@@ -38,7 +38,8 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 		 */
 		public function init() {
 
-			// Includes.
+			// Includes. The output-buffer guard trait must load before any class that uses it.
+			require_once ATSS_PATH . 'v2/classes/trait-json-output-guard.php';
 			require_once ATSS_PATH . 'v2/classes/class-demos.php';
 			require_once ATSS_PATH . 'v2/classes/class-widget-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-customizer-importer.php';
