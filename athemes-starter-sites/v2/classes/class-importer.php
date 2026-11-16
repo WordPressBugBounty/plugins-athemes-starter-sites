@@ -42,6 +42,21 @@ class Athemes_Starter_Sites_Importer {
 	private $importer;
 
 	/**
+	 * Posts this contents request inserted or failed to insert. Posts skipped
+	 * because they already exist are not counted.
+	 *
+	 * @var int
+	 */
+	private $handled_posts = 0;
+
+	/**
+	 * Whether this request carries the legacy demos page nonce.
+	 *
+	 * @var bool
+	 */
+	private $is_legacy_request = false;
+
+	/**
 	 * Singleton instance
 	 *
 	 * @var Athemes_Starter_Sites_Import
@@ -71,18 +86,21 @@ class Athemes_Starter_Sites_Importer {
 	 * Send a JSON response after discarding any buffered stray output, so
 	 * PHP notices/warnings printed during the import cannot corrupt the body.
 	 *
-	 * @param bool  $success Whether the request succeeded.
-	 * @param mixed $data    Response payload (keep it a string for errors —
-	 *                       the legacy demos page renders it directly).
+	 * @param bool     $success     Whether the request succeeded.
+	 * @param mixed    $data        Response payload (keep it a string for errors —
+	 *                              the legacy demos page renders it directly).
+	 * @param int|null $status_code HTTP status of an error response. Default 200.
 	 */
-	private function send_json( $success, $data = null ) {
+	private function send_json( $success, $data = null, $status_code = null ) {
+
+		Athemes_Starter_Sites_Import_Lock::release();
 
 		$this->discard_stray_output();
 
 		if ( $success ) {
 			wp_send_json_success( $data );
 		} else {
-			wp_send_json_error( $data );
+			wp_send_json_error( $data, $status_code );
 		}
 
 	}
@@ -94,6 +112,8 @@ class Athemes_Starter_Sites_Importer {
 	 * @param mixed $response Full response array.
 	 */
 	private function send_json_raw( $response ) {
+
+		Athemes_Starter_Sites_Import_Lock::release();
 
 		$this->discard_stray_output();
 
@@ -111,6 +131,7 @@ class Athemes_Starter_Sites_Importer {
 
 		// Check legacy nonce first.
 		if ( wp_verify_nonce( $nonce, 'atss_legacy_import' ) ) {
+			$this->is_legacy_request = true;
 			return;
 		}
 
@@ -120,6 +141,185 @@ class Athemes_Starter_Sites_Importer {
 		}
 
 		$this->send_json( false, esc_html__( 'Invalid nonce.', 'athemes-starter-sites' ) );
+	}
+
+	/**
+	 * Take the global import lock for this request.
+	 *
+	 * A legacy demos page request waits up to 30 s and then takes the lock
+	 * over, so that page never receives the lock string. A wizard request
+	 * that finds the lock held answers `import_step_in_progress`, which the
+	 * wizard treats as a wait.
+	 *
+	 * @param int $ttl Lock lifetime in seconds.
+	 * @return void Sends a JSON error and dies when a wizard request cannot take the lock.
+	 */
+	private function acquire_import_lock( $ttl = 150 ) {
+
+		if ( $this->is_legacy_request ) {
+			Athemes_Starter_Sites_Import_Lock::acquire( $ttl, 30 );
+			return;
+		}
+
+		if ( ! Athemes_Starter_Sites_Import_Lock::acquire( $ttl ) ) {
+			$this->send_json( false, 'import_step_in_progress' );
+		}
+
+	}
+
+	/**
+	 * Cap the timeout of outgoing HTTP calls, so no gap between the lock
+	 * refreshes that follow each call outlasts the lock TTL.
+	 *
+	 * @param array $args HTTP request arguments.
+	 * @return array
+	 */
+	public function cap_http_timeout( $args ) {
+
+		$args['timeout'] = min( (float) $args['timeout'], 120 );
+
+		return $args;
+
+	}
+
+	/**
+	 * Download the demo XML to a temp file, with one retry.
+	 *
+	 * The second attempt runs unless the first failed with a 4xx response,
+	 * where the file is missing or forbidden and a repeat cannot help. The
+	 * timeout of one attempt is clamped to 5-55 s, so two attempts fit the
+	 * legacy demos page's 120 s request timeout.
+	 *
+	 * @param string $xml_file_url Demo XML URL.
+	 * @return string|WP_Error Temp file path, or the error of the last attempt.
+	 */
+	private function download_demo_xml( $xml_file_url ) {
+
+		// Also loads wp_handle_sideload(), which the callers use next.
+		if ( ! function_exists( 'download_url' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
+
+		/**
+		 * Filters the timeout of one demo XML download attempt.
+		 *
+		 * @param int $timeout Timeout in seconds, clamped to 5-55. Default 45.
+		 */
+		$timeout = apply_filters( 'atss_demo_xml_download_timeout', 45 );
+		$timeout = max( 5, min( (int) $timeout, 55 ) );
+
+		Athemes_Starter_Sites_Import_Lock::refresh( 90 );
+		$temp_file = download_url( $xml_file_url, $timeout );
+
+		if ( is_wp_error( $temp_file ) ) {
+
+			$status = $this->get_wp_error_http_status( $temp_file );
+
+			if ( $status < 400 || $status > 499 ) {
+				Athemes_Starter_Sites_Import_Lock::refresh( 90 );
+				$temp_file = download_url( $xml_file_url, $timeout );
+			}
+		}
+
+		return $temp_file;
+
+	}
+
+	/**
+	 * HTTP status stored in a WP_Error's data.
+	 *
+	 * download_url() uses the code http_404 for every non-200 response and
+	 * keeps the real status in the data's 'code' key.
+	 *
+	 * @param WP_Error $error Error to read.
+	 * @return int The status, or 0 when the data carries none.
+	 */
+	private function get_wp_error_http_status( $error ) {
+
+		$data = $error->get_error_data();
+
+		if ( is_array( $data ) && isset( $data['code'] ) && is_int( $data['code'] ) ) {
+			return $data['code'];
+		}
+
+		return 0;
+
+	}
+
+	/**
+	 * Describe a WP_Error as '<code>: <message>', or as
+	 * '<code> (HTTP <status>): <message>' when its data carries a status.
+	 *
+	 * The result is plain text (tags stripped, not HTML-escaped), at most 200
+	 * characters. A caller that outputs it as HTML escapes it.
+	 *
+	 * @param WP_Error $error Error to describe.
+	 * @return string
+	 */
+	private function describe_wp_error( $error ) {
+
+		$status      = $this->get_wp_error_http_status( $error );
+		$description = $error->get_error_code() . ( $status ? ' (HTTP ' . $status . ')' : '' ) . ': ' . $error->get_error_message();
+		$description = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $description ) ) );
+
+		return mb_substr( $description, 0, 200 );
+
+	}
+
+	/**
+	 * Forget the cached demo XML.
+	 *
+	 * Unlinks the file named by the atss_importer_data transient when it is
+	 * inside the uploads base dir, then deletes the transient, so a later
+	 * import cannot reuse the XML of a different demo. The transient holds
+	 * array( 'url', 'path' ), or a plain path when an earlier plugin version
+	 * wrote it.
+	 *
+	 * @return void
+	 */
+	private function reset_importer_xml() {
+
+		$xml_cache     = get_transient( 'atss_importer_data' );
+		$xml_file_path = ( is_array( $xml_cache ) && isset( $xml_cache['path'] ) ) ? $xml_cache['path'] : $xml_cache;
+
+		if ( $xml_file_path && is_string( $xml_file_path ) && file_exists( $xml_file_path ) ) {
+
+			$uploads   = wp_upload_dir( null, false );
+			$base_dir  = realpath( $uploads['basedir'] );
+			$file_path = realpath( $xml_file_path );
+
+			if ( $base_dir && $file_path && 0 === strpos( wp_normalize_path( $file_path ), trailingslashit( wp_normalize_path( $base_dir ) ) ) ) {
+				wp_delete_file( $file_path );
+			}
+		}
+
+		delete_transient( 'atss_importer_data' );
+
+	}
+
+	/**
+	 * The cached demo XML for a URL.
+	 *
+	 * Reuses the file only when the atss_importer_data transient was written
+	 * for this URL and the file still exists. Otherwise forgets the cache, so
+	 * the file of another demo, or of an earlier plugin version's plain-path
+	 * value, does not stay behind.
+	 *
+	 * @param string $xml_file_url Demo XML URL.
+	 * @return string The cached file's path, or '' when the XML must be downloaded.
+	 */
+	private function get_cached_demo_xml( $xml_file_url ) {
+
+		$xml_cache = get_transient( 'atss_importer_data' );
+
+		if ( is_array( $xml_cache ) && isset( $xml_cache['url'], $xml_cache['path'] ) && $xml_file_url === $xml_cache['url'] && is_string( $xml_cache['path'] ) && file_exists( $xml_cache['path'] ) ) {
+			return $xml_cache['path'];
+		}
+
+		$this->reset_importer_xml();
+
+		return '';
+
 	}
 
 	/**
@@ -156,6 +356,9 @@ class Athemes_Starter_Sites_Importer {
 			$wpdb->hide_errors();
 			@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed, WordPress.PHP.NoSilencedErrors.Discouraged
 			ob_start();
+
+			// Import steps unzip plugin packages and parse large XML files.
+			wp_raise_memory_limit( 'admin' );
 
 			// Flag the request the way core flags bulk activations — the
 			// convention most welcome redirects honour.
@@ -278,9 +481,15 @@ class Athemes_Starter_Sites_Importer {
 	/**
 	 * Install a plugin.
 	 *
-	 * @param string $plugin_slug Plugin slug.
+	 * Reports every failure the way core's wp_ajax_install_plugin() does, so
+	 * a failed install never reaches activation as a silent false. Unlike
+	 * core, a filesystem connection failure always gets a fixed message.
+	 *
+	 * @param string $plugin_slug Plugin slug, or a package URL.
+	 * @param bool   $overwrite   Replace the plugin's folder when it already exists.
+	 * @return true|WP_Error|null True when installed, the install error otherwise. Null when the user cannot install plugins.
 	 */
-	public function install_plugin( $plugin_slug ) {
+	public function install_plugin( $plugin_slug, $overwrite = false ) {
 
 		if ( ! current_user_can( 'install_plugins' ) ) {
 			return;
@@ -328,13 +537,123 @@ class Athemes_Starter_Sites_Importer {
 		// ref: function wp_ajax_install_plugin().
 		$upgrader = new Plugin_Upgrader( new WP_Ajax_Upgrader_Skin() );
 
-		$install = $upgrader->install( $download_link );
+		$install = $upgrader->install( $download_link, array( 'overwrite_package' => (bool) $overwrite ) );
 
 		if ( is_wp_error( $install ) ) {
 			return $install;
 		}
 
-		return true === $install;
+		if ( is_wp_error( $upgrader->skin->result ) ) {
+			return $upgrader->skin->result;
+		}
+
+		if ( $upgrader->skin->get_errors()->has_errors() ) {
+			return $upgrader->skin->get_errors();
+		}
+
+		// The upgrader returns null or false when it cannot connect to the
+		// filesystem. Any other result but true is treated the same way.
+		// The message is fixed: the FTP/SSH filesystem errors name the account
+		// and host, and this text reaches the wizard's off-site telemetry.
+		if ( true !== $install ) {
+			return new WP_Error( 'unable_to_connect_to_filesystem', __( 'Unable to connect to the filesystem. Please confirm your credentials.', 'athemes-starter-sites' ) );
+		}
+
+		return true;
+
+	}
+
+	/**
+	 * Name of the transient that marks an install of a plugin as running.
+	 *
+	 * The marker is set before install_plugin() and deleted when it returns,
+	 * so it outlives only an install the server killed.
+	 *
+	 * @param string $plugin_path Plugin path (folder/file.php).
+	 * @return string
+	 */
+	private function get_plugin_install_marker( $plugin_path ) {
+
+		return 'atss_plugin_installing_' . md5( $plugin_path );
+
+	}
+
+	/**
+	 * Decide how to bring a plugin that is not active onto the site.
+	 *
+	 * A marker left by a killed install means the files on disk may be
+	 * truncated, so they are replaced and never activated first. Without the
+	 * marker, an existing folder is replaced only when it holds no plugin, so
+	 * another plugin that uses the folder name is left alone.
+	 *
+	 * Core clears the folder the slug's package unpacks into, not the folder
+	 * checked here, so 'overwrite' is returned only when the slug names that
+	 * folder. Otherwise the plain install lets core's folder_exists check
+	 * protect whatever is there.
+	 *
+	 * @param string $plugin_slug Plugin slug, or a package URL.
+	 * @param string $plugin_path Plugin path (folder/file.php).
+	 * @param string $status      'not_installed' or 'inactive'.
+	 * @return string|WP_Error 'overwrite', 'activate' or 'install', or a
+	 *                         folder_exists_with_other_plugin error.
+	 */
+	private function get_plugin_install_action( $plugin_slug, $plugin_path, $status ) {
+
+		$folder        = dirname( $plugin_path );
+		$can_overwrite = false === filter_var( $plugin_slug, FILTER_VALIDATE_URL ) && $plugin_slug === $folder;
+
+		if ( get_transient( $this->get_plugin_install_marker( $plugin_path ) ) ) {
+			return $can_overwrite ? 'overwrite' : 'install';
+		}
+
+		if ( 'inactive' === $status ) {
+			return 'activate';
+		}
+
+		if ( '.' === $folder || ! is_dir( WP_PLUGIN_DIR . '/' . $folder ) ) {
+			return 'install';
+		}
+
+		if ( ! function_exists( 'get_plugins' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+
+		$this->refresh_plugins_cache();
+
+		if ( array() === get_plugins( '/' . $folder ) ) {
+			return $can_overwrite ? 'overwrite' : 'install';
+		}
+
+		return new WP_Error(
+			'folder_exists_with_other_plugin',
+			sprintf(
+				/* translators: %s: plugin folder name. */
+				__( 'The plugin folder %s already holds another plugin, so it was left in place. Remove or rename that folder, then try again.', 'athemes-starter-sites' ),
+				$folder
+			)
+		);
+
+	}
+
+	/**
+	 * Install a plugin under its install marker.
+	 *
+	 * @param string $plugin_slug Plugin slug, or a package URL.
+	 * @param string $plugin_path Plugin path (folder/file.php).
+	 * @param bool   $overwrite   Replace the plugin's folder when it already exists.
+	 * @return true|WP_Error|null See install_plugin().
+	 */
+	private function install_plugin_with_marker( $plugin_slug, $plugin_path, $overwrite ) {
+
+		$marker = $this->get_plugin_install_marker( $plugin_path );
+
+		set_transient( $marker, 1, HOUR_IN_SECONDS );
+
+		$install = $this->install_plugin( $plugin_slug, $overwrite );
+
+		delete_transient( $marker );
+
+		return $install;
 
 	}
 
@@ -380,6 +699,15 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'You are not permitted to start demo.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock();
+
+		$this->reset_importer_xml();
+
+		// A new run invalidates the done markers of the previous one.
+		delete_transient( 'atss_import_finished' );
+		delete_transient( 'atss_import_customizer_done' );
+		delete_transient( 'atss_import_widgets_done' );
+
 		/**
 		 * Action hook.
 		 */
@@ -412,6 +740,8 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'You are not permitted to clean previous import.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock();
+
 		/**
 		 * Suspend bunches of stuff in WP core.
 		 */
@@ -427,6 +757,7 @@ class Athemes_Starter_Sites_Importer {
 
 		if ( ! empty( $result ) ) {
 			foreach ( $result as $post_id ) {
+				Athemes_Starter_Sites_Import_Lock::refresh();
 				$post_type = get_post_type( $post_id );
 				if ( $post_type === 'elementor_library' ) {
 					$_GET['force_delete_kit'] = true;
@@ -443,6 +774,7 @@ class Athemes_Starter_Sites_Importer {
 
 		if ( ! empty( $result ) ) {
 			foreach ( $result as $term_id ) {
+				Athemes_Starter_Sites_Import_Lock::refresh();
 				$term = get_term( $term_id );
 				if ( ! is_wp_error( $term ) && ! empty( $term ) && is_object( $term ) ) {
 					wp_delete_term( $term->term_id, $term->taxonomy );
@@ -583,27 +915,62 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'Invalid demo id.', 'athemes-starter-sites' ) );
 		}
 
+		// An already active plugin succeeds before the capability check, so a
+		// user without install_plugins gets no failure for it. Nothing is
+		// installed, so the answer takes no lock. It clears the install marker
+		// and fires the action hook, as the install path below does.
+		if ( 'active' === $this->get_plugin_status_uncapped( $path ) ) {
+
+			delete_transient( $this->get_plugin_install_marker( $path ) );
+
+			/**
+			 * Action hook.
+			 */
+			do_action( 'atss_import_plugin', $slug, $path );
+
+			$this->send_json( true );
+
+		}
+
 		if ( ! current_user_can( 'install_plugins' ) ) {
 			$this->send_json( false, esc_html__( 'Insufficient permissions to install the plugin.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock();
+		add_filter( 'http_request_args', array( $this, 'cap_http_timeout' ) );
+
 		$install_result  = null;
 		$activate_result = null;
+		$status          = $this->get_plugin_status( $path );
 
-		if ( 'not_installed' === $this->get_plugin_status( $path ) ) {
+		// An active plugin was answered above.
+		if ( 'not_installed' === $status || 'inactive' === $status ) {
 
-			$install_result = $this->install_plugin( $slug );
+			$action = $this->get_plugin_install_action( $slug, $path, $status );
 
-			$this->refresh_plugins_cache();
+			if ( is_wp_error( $action ) ) {
 
-			$activate_result = $this->activate_plugin( $path );
+				$install_result = $action;
 
-		} elseif ( 'inactive' === $this->get_plugin_status( $path ) ) {
+			} elseif ( 'activate' === $action ) {
 
-			$this->refresh_plugins_cache();
+				$this->refresh_plugins_cache();
 
-			$activate_result = $this->activate_plugin( $path );
+				$activate_result = $this->activate_plugin( $path );
 
+			} else {
+
+				$install_result = $this->install_plugin_with_marker( $slug, $path, 'overwrite' === $action );
+
+				// Never activate after a failed install: the files may be half written.
+				if ( true === $install_result ) {
+
+					$this->refresh_plugins_cache();
+
+					$activate_result = $this->activate_plugin( $path );
+
+				}
+			}
 		}
 
 		/**
@@ -620,21 +987,19 @@ class Athemes_Starter_Sites_Importer {
 
 		$reason = '';
 
-		if ( is_wp_error( $activate_result ) ) {
-			$reason = $activate_result->get_error_code() . ' — ' . $activate_result->get_error_message();
-		} elseif ( is_wp_error( $install_result ) ) {
-			$reason = $install_result->get_error_code() . ' — ' . $install_result->get_error_message();
+		if ( is_wp_error( $install_result ) ) {
+			/* translators: %s: plugin install error code and message. */
+			$message = esc_html__( 'Plugin installation failed: %s', 'athemes-starter-sites' );
+			$reason  = $this->describe_wp_error( $install_result );
+		} elseif ( is_wp_error( $activate_result ) ) {
+			/* translators: %s: plugin activation error code and message. */
+			$message = esc_html__( 'Plugin activation failed: %s', 'athemes-starter-sites' );
+			$reason  = $this->describe_wp_error( $activate_result );
 		}
 
 		if ( '' !== $reason ) {
-			$this->send_json(
-				false,
-				sprintf(
-					/* translators: %s: plugin install/activation error code and message. */
-					esc_html__( 'Plugin activation failed: %s', 'athemes-starter-sites' ),
-					esc_html( $reason )
-				)
-			);
+			// The legacy demos page renders the message as HTML, the wizard as text.
+			$this->send_json( false, sprintf( $message, $this->is_legacy_request ? esc_html( $reason ) : $reason ) );
 		}
 
 		$this->send_json( false, esc_html__( 'Failed to initialize or activate importer plugin.', 'athemes-starter-sites' ) );
@@ -671,29 +1036,37 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'You are not permitted to import contents.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock( 90 );
+
+		// Time to run the import!
+		set_time_limit( 0 );
+
+		// Start the chunk budget measured by ajax_request_maybe() before the
+		// download, so download time counts against it.
+		$this->microtime = microtime( true );
+
 		$this->maybe_enable_elementor_container_experiment( $builder_type );
 
 		$xml_file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['content'];
 
-		$xml_file_path = get_transient( 'atss_importer_data' );
+		$xml_file_path = $this->get_cached_demo_xml( $xml_file_url );
 
-		if ( ! $xml_file_path || ! file_exists( $xml_file_path ) ) {
+		if ( '' === $xml_file_path ) {
 
 			/**
 			 * Download contents.xml
 			 */
-			if ( ! function_exists( 'download_url' ) ) {
-				require_once ABSPATH . 'wp-admin/includes/file.php';
-			}
-
-			// Set timeout.
-			$timeout_seconds = 5;
-
-			// Download file to temp dir.
-			$temp_file = download_url( $xml_file_url, $timeout_seconds );
+			$temp_file = $this->download_demo_xml( $xml_file_url );
 
 			if ( is_wp_error( $temp_file ) ) {
-				$this->send_json( false, esc_html__( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ) );
+				// The legacy demos page renders the message as HTML, the wizard as text.
+				$detail = $this->describe_wp_error( $temp_file );
+
+				if ( $this->is_legacy_request ) {
+					$detail = esc_html( $detail );
+				}
+
+				$this->send_json( false, sprintf( '%s (%s)', esc_html__( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ), $detail ) );
 			}
 
 			// Array based on $_FILE as seen in PHP file uploads.
@@ -718,13 +1091,14 @@ class Athemes_Starter_Sites_Importer {
 
 			// Error when downloading XML file.
 			if ( isset( $download_response['error'] ) ) {
+				wp_delete_file( $temp_file );
 				$this->send_json( false, esc_html__( 'Failed to download demo xml file.', 'athemes-starter-sites' ) );
 			}
 
 			// Define the downloaded contents.xml file path.
 			$xml_file_path = $download_response['file'];
 
-			set_transient( 'atss_importer_data', $xml_file_path, HOUR_IN_SECONDS );
+			set_transient( 'atss_importer_data', array( 'url' => $xml_file_url, 'path' => $xml_file_path ), HOUR_IN_SECONDS );
 
 		}
 
@@ -750,16 +1124,15 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Prepare the importer.
 		 */
-		// Time to run the import!
-		set_time_limit( 0 );
-
-		$this->microtime = microtime( true );
-
 		// Are we allowed to create users?
 		add_filter( 'wxr_importer.pre_process.user', '__return_null' );
 
 		// Check, if we need to send another AJAX request and set the importing author to the current user.
 		add_filter( 'wxr_importer.pre_process.post', array( $this, 'ajax_request_maybe' ) );
+
+		// Count the posts this request handled, for the split rule in ajax_request_maybe().
+		add_action( 'wxr_importer.processed.post', array( $this, 'count_handled_post' ) );
+		add_action( 'wxr_importer.process_failed.post', array( $this, 'count_handled_post' ) );
 
 		// Post content replace attachment urls
   	add_filter( 'wxr_importer.pre_process.post', array( $this, 'post_content_replace_attachment_urls' ) );
@@ -837,6 +1210,7 @@ class Athemes_Starter_Sites_Importer {
 		/**
 		 * Action hook.
 		 */
+		Athemes_Starter_Sites_Import_Lock::refresh( 90 );
 		do_action( 'atss_import_contents' );
 
 		/**
@@ -956,6 +1330,11 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function ajax_request_maybe( $data ) {
 
+		// Per-post heartbeat for the contents lock. A request that no longer
+		// holds the lock ends its chunk below, so two requests never import in
+		// parallel.
+		$holds_lock = Athemes_Starter_Sites_Import_Lock::refresh( 90 );
+
 		$time = microtime( true ) - $this->microtime;
 
 		// Check attachment count for splitting - only split if significant time has also passed
@@ -975,7 +1354,18 @@ class Athemes_Starter_Sites_Importer {
 		// We should make a new ajax call, if the time is right OR attachment count is reached.
 		// Reduced from 300 to 120 to align better with JS timeout of 120 seconds
 		$time_limit = apply_filters( 'atss_time_for_one_ajax_call', 120 );
-		if ( $time > $time_limit || $should_split_by_count ) {
+
+		// Neither rule splits before this request handled a post, so every
+		// request makes progress even when the XML download used up the
+		// budget. Past the budget plus 60 s it splits anyway, so a request
+		// whose posts never complete cannot run without bound. That hard stop
+		// stays 30 s short of the client's request timeout (wizard 180 s,
+		// legacy demos page 120 s), so the split answer arrives before the
+		// client gives up. A lost lock always stops at once.
+		$may_split = $this->handled_posts > 0 && ( $time > $time_limit || $should_split_by_count );
+		$hard_stop = min( $time_limit + 60, $this->is_legacy_request ? 90 : 150 );
+
+		if ( ! $holds_lock || $may_split || $time > $hard_stop ) {
 
 			// Reset the attachment counter for the next AJAX call
 			if ( $this->importer && method_exists( $this->importer, 'reset_attachment_count' ) ) {
@@ -1004,6 +1394,17 @@ class Athemes_Starter_Sites_Importer {
 		}
 
 		return $data;
+
+	}
+
+	/**
+	 * Count a post this contents request inserted or failed to insert.
+	 *
+	 * @return void
+	 */
+	public function count_handled_post() {
+
+		$this->handled_posts++;
 
 	}
 
@@ -1314,6 +1715,14 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'You are not permitted to import widgets.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock();
+
+		// A repeat call for a widgets step that already completed has nothing
+		// left to do. Running it again would import every widget twice.
+		if ( get_transient( 'atss_import_widgets_done' ) === $demo_id . '|' . $builder_type ) {
+			$this->send_json( true );
+		}
+
 		$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['widgets'];
 
 		/**
@@ -1329,18 +1738,23 @@ class Athemes_Starter_Sites_Importer {
 		);
 
 		// Check if fetch failed - log and skip instead of stopping import.
+		// A failed fetch may succeed when repeated, so the wizard gets a 503,
+		// which it Retries once.
 		if ( is_wp_error( $raw ) ) {
 			// Log error but continue to next step
 			error_log( 'ATSS Widget Import: Failed to fetch widget file - ' . $raw->get_error_message() );
-			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			$this->send_widgets_skipped( __( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ), 503 );
 			return;
 		}
 
-		// Check response code - skip if not successful.
-		if ( 200 !== wp_remote_retrieve_response_code( $raw ) ) {
+		// Check response code - skip if not successful. A 4xx means the file
+		// is missing or forbidden and a repeat cannot help, as for the demo XML.
+		$code = (int) wp_remote_retrieve_response_code( $raw );
+
+		if ( 200 !== $code ) {
 			// Log error but continue to next step
-			error_log( 'ATSS Widget Import: Failed to load widget file. HTTP ' . wp_remote_retrieve_response_code( $raw ) );
-			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ) ) );
+			error_log( 'ATSS Widget Import: Failed to load widget file. HTTP ' . $code );
+			$this->send_widgets_skipped( __( 'Widget import skipped (file unavailable)', 'athemes-starter-sites' ), ( $code < 400 || $code > 499 ) ? 503 : null );
 			return;
 		}
 
@@ -1361,7 +1775,7 @@ class Athemes_Starter_Sites_Importer {
 		// Check if JSON decode failed - skip if so.
 		if ( empty( $data ) ) {
 			error_log( 'ATSS Widget Import: Failed to decode widget JSON data' );
-			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) ) );
+			$this->send_widgets_skipped( __( 'Widget import skipped (invalid data)', 'athemes-starter-sites' ) );
 			return;
 		}
 
@@ -1392,7 +1806,7 @@ class Athemes_Starter_Sites_Importer {
 			// Log error but continue to next step instead of stopping
 			$error_message = $results->get_error_message();
 			error_log( 'ATSS Widget Import: Widget import failed - ' . $error_message );
-			$this->send_json( true, array( 'message' => esc_html__( 'Widget import completed with errors', 'athemes-starter-sites' ) ) );
+			$this->send_widgets_skipped( __( 'Widget import completed with errors', 'athemes-starter-sites' ) );
 			return;
 		}
 
@@ -1426,6 +1840,8 @@ class Athemes_Starter_Sites_Importer {
 			// Continue to success even if hooks fail
 		}
 
+		set_transient( 'atss_import_widgets_done', $demo_id . '|' . $builder_type, 600 );
+
 		/**
 		 * Return successful AJAX.
 		 */
@@ -1441,8 +1857,31 @@ class Athemes_Starter_Sites_Importer {
 					$e->getLine()
 				)
 			);
-			$this->send_json( true, array( 'message' => esc_html__( 'Widget import skipped (unexpected error)', 'athemes-starter-sites' ) ) );
+			$this->send_widgets_skipped( __( 'Widget import skipped (unexpected error)', 'athemes-starter-sites' ) );
 		}
+
+	}
+
+	/**
+	 * Answer a widgets import that a failure skipped.
+	 *
+	 * The legacy demos page continues on widget errors by design and renders
+	 * a false answer as a fatal error, so it keeps receiving a success. The
+	 * wizard receives the failure, so it lists the step as an Issue, after
+	 * one Retry when the failure is answered with a transient status.
+	 *
+	 * @param string   $message     Plain-text reason.
+	 * @param int|null $status_code HTTP status for the wizard, 503 for a failure
+	 *                              that may pass on a repeat. Default 200.
+	 * @return void Sends JSON and dies.
+	 */
+	private function send_widgets_skipped( $message, $status_code = null ) {
+
+		if ( $this->is_legacy_request ) {
+			$this->send_json( true, array( 'message' => esc_html( $message ) ) );
+		}
+
+		$this->send_json( false, $message, $status_code );
 
 	}
 
@@ -1475,6 +1914,20 @@ class Athemes_Starter_Sites_Importer {
 		if ( ! current_user_can( 'edit_theme_options' ) ) {
 			$this->send_json( false, esc_html__( 'You are not permitted to import customizer.', 'athemes-starter-sites' ) );
 		}
+
+		$this->acquire_import_lock();
+
+		// A repeat call for a customizer step that already completed has
+		// nothing left to do. Running it again would sideload its images again.
+		if ( get_transient( 'atss_import_customizer_done' ) === $demo_id . '|' . $builder_type ) {
+			$this->send_json( true );
+		}
+
+		// A finish that follows this customizer run must run the after-import
+		// hooks again, even when another import set the finish marker.
+		delete_transient( 'atss_import_finished' );
+
+		add_filter( 'http_request_args', array( $this, 'cap_http_timeout' ) );
 
 		$file_url = $this->demos[ $demo_id ]['import'][ $builder_type ]['customizer'];
 
@@ -1557,6 +2010,8 @@ class Athemes_Starter_Sites_Importer {
 		 */
 		do_action( 'atss_import_customizer', $data );
 
+		set_transient( 'atss_import_customizer_done', $demo_id . '|' . $builder_type, 600 );
+
 		/**
 		 * Return successful AJAX.
 		 */
@@ -1604,20 +2059,23 @@ class Athemes_Starter_Sites_Importer {
 			$this->send_json( false, esc_html__( 'You are not permitted to finish the import.', 'athemes-starter-sites' ) );
 		}
 
+		$this->acquire_import_lock();
+
+		// A repeat call for a finish that already completed has nothing left to do.
+		if ( get_transient( 'atss_import_finished' ) === $demo_id . '|' . $builder_type ) {
+			delete_option( 'atss_wizard_state' );
+			$this->send_json( true );
+		}
+
 		/**
 		 * Delete imported XML file.
 		 */
-		$xml_file_path = get_transient( 'atss_importer_data' );
-
-		if ( $xml_file_path && file_exists( $xml_file_path ) ) {
-			unlink( $xml_file_path );
-			delete_transient( 'atss_importer_data' );
-		}
+		$this->reset_importer_xml();
 
 		/**
 		 * Elementor clear cache.
 		 */
-		if ( class_exists( 'Elementor\Plugin' ) ) {
+		if ( class_exists( 'Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
 			Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
 
@@ -1673,6 +2131,8 @@ class Athemes_Starter_Sites_Importer {
 		 */
 		delete_option( 'atss_wizard_state' );
 
+		set_transient( 'atss_import_finished', $demo_id . '|' . $builder_type, 600 );
+
 		/**
 		 * Return successful AJAX.
 		 */
@@ -1726,6 +2186,10 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	public function import( $demo_id, $builder_type, $options = array() ) {
 
+		// The import unzips plugin packages and parses large XML files, like
+		// the AJAX steps that raise the limit in init().
+		wp_raise_memory_limit( 'admin' );
+
 		// The ability calls instance(), which lazily constructs a fresh object
 		// whose after_setup_theme->init() (the only thing that fills $this->demos)
 		// can no longer fire. Repopulate on demand so validation has data.
@@ -1757,13 +2221,7 @@ class Athemes_Starter_Sites_Importer {
 
 		// A cached XML from a previous (possibly different-demo or aborted) run
 		// must not be reused: the sync path always downloads fresh.
-		$stale_xml = get_transient( 'atss_importer_data' );
-		if ( $stale_xml ) {
-			if ( file_exists( $stale_xml ) ) {
-				unlink( $stale_xml );
-			}
-			delete_transient( 'atss_importer_data' );
-		}
+		$this->reset_importer_xml();
 
 		// 1. Start.
 		$steps['start'] = $this->run_import_start( $demo_id, $builder_type );
@@ -1976,8 +2434,26 @@ class Athemes_Starter_Sites_Importer {
 			$activate_result = null;
 
 			$status = $this->get_plugin_status_uncapped( $path );
+			$action = 'active' === $status ? 'none' : $this->get_plugin_install_action( $slug, $path, $status );
 
-			if ( 'not_installed' === $status ) {
+			if ( 'none' === $action ) {
+				delete_transient( $this->get_plugin_install_marker( $path ) );
+			} elseif ( 'activate' === $action ) {
+				if ( current_user_can( 'activate_plugins' ) ) {
+					$this->refresh_plugins_cache();
+					$activate_result = activate_plugin( $path, '', false, true );
+				} elseif ( ! empty( $plugin['required'] ) ) {
+					return array(
+						'success' => false,
+						'message' => sprintf(
+							/* translators: %s: plugin name. */
+							__( 'Insufficient permissions to activate the required plugin: %s', 'athemes-starter-sites' ),
+							isset( $plugin['name'] ) ? $plugin['name'] : $slug
+						),
+						'plugins' => $results,
+					);
+				}
+			} else {
 				if ( ! current_user_can( 'install_plugins' ) ) {
 					// Only a *required* plugin that cannot be installed aborts the import.
 					if ( ! empty( $plugin['required'] ) ) {
@@ -2001,23 +2477,15 @@ class Athemes_Starter_Sites_Importer {
 					$results[ $path ] = $status;
 					continue;
 				}
-				$install_result = $this->install_plugin( $slug );
-				$this->refresh_plugins_cache();
-				$activate_result = $this->activate_plugin( $path );
-			} elseif ( 'inactive' === $status ) {
-				if ( current_user_can( 'activate_plugins' ) ) {
-					$this->refresh_plugins_cache();
-					$activate_result = activate_plugin( $path, '', false, true );
-				} elseif ( ! empty( $plugin['required'] ) ) {
-					return array(
-						'success' => false,
-						'message' => sprintf(
-							/* translators: %s: plugin name. */
-							__( 'Insufficient permissions to activate the required plugin: %s', 'athemes-starter-sites' ),
-							isset( $plugin['name'] ) ? $plugin['name'] : $slug
-						),
-						'plugins' => $results,
-					);
+				if ( is_wp_error( $action ) ) {
+					$install_result = $action;
+				} else {
+					$install_result = $this->install_plugin_with_marker( $slug, $path, 'overwrite' === $action );
+					// Never activate after a failed install: the files may be half written.
+					if ( true === $install_result ) {
+						$this->refresh_plugins_cache();
+						$activate_result = $this->activate_plugin( $path );
+					}
 				}
 			}
 
@@ -2030,10 +2498,10 @@ class Athemes_Starter_Sites_Importer {
 				// Surface the underlying WP_Error (mirrors ajax_import_plugin()) so a
 				// headless caller can tell a network failure from a permissions one.
 				$reason = '';
-				if ( is_wp_error( $activate_result ) ) {
-					$reason = $activate_result->get_error_code() . ' — ' . $activate_result->get_error_message();
-				} elseif ( is_wp_error( $install_result ) ) {
-					$reason = $install_result->get_error_code() . ' — ' . $install_result->get_error_message();
+				if ( is_wp_error( $install_result ) ) {
+					$reason = $this->describe_wp_error( $install_result );
+				} elseif ( is_wp_error( $activate_result ) ) {
+					$reason = $this->describe_wp_error( $activate_result );
 				}
 
 				return array(
@@ -2107,23 +2575,21 @@ class Athemes_Starter_Sites_Importer {
 			);
 		}
 
+		set_time_limit( 0 );
+
 		$this->maybe_enable_elementor_container_experiment( $builder_type );
 
 		$xml_file_url  = $this->demos[ $demo_id ]['import'][ $builder_type ]['content'];
-		$xml_file_path = get_transient( 'atss_importer_data' );
+		$xml_file_path = $this->get_cached_demo_xml( $xml_file_url );
 
-		if ( ! $xml_file_path || ! file_exists( $xml_file_path ) ) {
+		if ( '' === $xml_file_path ) {
 
-			if ( ! function_exists( 'download_url' ) ) {
-				require_once ABSPATH . 'wp-admin/includes/file.php';
-			}
-
-			$temp_file = download_url( $xml_file_url, 5 );
+			$temp_file = $this->download_demo_xml( $xml_file_url );
 
 			if ( is_wp_error( $temp_file ) ) {
 				return array(
 					'success' => false,
-					'message' => __( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ),
+					'message' => sprintf( '%s (%s)', esc_html__( 'Failed to download temporary demo xml file.', 'athemes-starter-sites' ), $this->describe_wp_error( $temp_file ) ),
 				);
 			}
 
@@ -2146,6 +2612,7 @@ class Athemes_Starter_Sites_Importer {
 			$download_response = wp_handle_sideload( $file_args, $overrides );
 
 			if ( isset( $download_response['error'] ) ) {
+				wp_delete_file( $temp_file );
 				return array(
 					'success' => false,
 					'message' => __( 'Failed to download demo xml file.', 'athemes-starter-sites' ),
@@ -2154,7 +2621,7 @@ class Athemes_Starter_Sites_Importer {
 
 			$xml_file_path = $download_response['file'];
 
-			set_transient( 'atss_importer_data', $xml_file_path, HOUR_IN_SECONDS );
+			set_transient( 'atss_importer_data', array( 'url' => $xml_file_url, 'path' => $xml_file_path ), HOUR_IN_SECONDS );
 		}
 
 		if ( ! class_exists( 'WP_Importer' ) ) {
@@ -2169,8 +2636,6 @@ class Athemes_Starter_Sites_Importer {
 		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WXRImportInfo.php';
 		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/WXRImporter.php';
 		require_once ATSS_PATH . 'v2/vendor/wp-content-importer-v2/Logger.php';
-
-		set_time_limit( 0 );
 
 		$this->microtime = microtime( true );
 
@@ -2460,14 +2925,9 @@ class Athemes_Starter_Sites_Importer {
 	 */
 	private function run_import_finish( $demo_id, $builder_type ) {
 
-		$xml_file_path = get_transient( 'atss_importer_data' );
+		$this->reset_importer_xml();
 
-		if ( $xml_file_path && file_exists( $xml_file_path ) ) {
-			unlink( $xml_file_path );
-			delete_transient( 'atss_importer_data' );
-		}
-
-		if ( class_exists( 'Elementor\Plugin' ) ) {
+		if ( class_exists( 'Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->files_manager ) ) {
 			Elementor\Plugin::$instance->files_manager->clear_cache();
 		}
 

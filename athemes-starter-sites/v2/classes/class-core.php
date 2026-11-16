@@ -43,6 +43,7 @@ if ( ! class_exists( 'Athemes_Starter_Sites' ) ) {
 			require_once ATSS_PATH . 'v2/classes/class-demos.php';
 			require_once ATSS_PATH . 'v2/classes/class-widget-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-customizer-importer.php';
+			require_once ATSS_PATH . 'v2/classes/class-import-lock.php';
 			require_once ATSS_PATH . 'v2/classes/class-importer.php';
 			require_once ATSS_PATH . 'v2/classes/class-core-helpers.php';
 			require_once ATSS_PATH . 'v2/classes/class-wpforms-helper.php';

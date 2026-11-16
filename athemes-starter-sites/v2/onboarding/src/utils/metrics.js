@@ -36,6 +36,12 @@ const allowedMetadataKeys = [
 	'error_message',
 	'http_status',
 	'plugin_slug',
+	'response_snippet',
+	'import_attempt',
+	'retry_count',
+	'failed_items_count',
+	'beacon_attempt',
+	'beacon_first_error',
 ];
 
 const MAX_ERROR_MESSAGE_LENGTH = 200;
@@ -132,11 +138,13 @@ const sanitizeMetadata = ( metadata = {} ) => {
 
 		let value = metadata[ key ];
 
-		// Keep error text privacy-safe: no URLs, bounded length.
-		if ( 'error_message' === key ) {
+		// Keep error text privacy-safe: no URLs, paths or email addresses, bounded length.
+		if ( 'error_message' === key || 'response_snippet' === key || 'beacon_first_error' === key ) {
 			value = String( value )
 				.replace( /https?:\/\/\S+/gi, '[url]' )
 				.replace( /(?:[A-Za-z]:)?[\\/](?:[\w .@~-]+[\\/]){2,}[\w .@-]*/g, '[path]' )
+				// Bounded parts keep the email match linear on long runs of word characters.
+				.replace( /[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+/g, '[email]' )
 				.replace( /\s+/g, ' ' )
 				.trim()
 				.slice( 0, MAX_ERROR_MESSAGE_LENGTH );
@@ -171,5 +179,72 @@ export const trackOnboardingEvent = async ( eventName, metadata = {} ) => {
 		} );
 	} catch ( error ) {
 		// Metrics should never block the onboarding flow.
+	}
+};
+
+const BEACON_TIMEOUT_MS = 4000;
+const BEACON_RETRY_DELAY_MS = 1000;
+
+/**
+ * Track an onboarding event and confirm the server forwarded it.
+ *
+ * Sends once, and once more after a short delay when the first attempt did not
+ * confirm, except after a client-side timeout: the server keeps running after
+ * the browser gives up and most likely forwards the event anyway, so a second
+ * send would record it twice. Never rejects, so it can never strand the
+ * onboarding flow.
+ *
+ * @param {string} eventName Event name.
+ * @param {Object} metadata  Event metadata.
+ * @return {Promise<boolean>} True only when the server confirmed the forward.
+ */
+export const trackOnboardingEventBlocking = async ( eventName, metadata = {} ) => {
+	if ( ! allowedEvents.includes( eventName ) ) {
+		return false;
+	}
+
+	const send = async ( extraMetadata ) => {
+		const result = await wpAjaxRequest(
+			'atss_track_onboarding_event',
+			{
+				event_name: eventName,
+				session_id: getSessionId(),
+				metadata: JSON.stringify( {
+					product: getProduct(),
+					...sanitizeMetadata( { ...metadata, ...extraMetadata } ),
+				} ),
+			},
+			{ timeoutMs: BEACON_TIMEOUT_MS }
+		);
+
+		return result?.forward;
+	};
+
+	let firstError;
+
+	try {
+		const forward = await send( { beacon_attempt: 1 } );
+
+		if ( 'sent' === forward ) {
+			return true;
+		}
+
+		firstError = `forward_${ forward }`;
+	} catch ( error ) {
+		if ( 'AbortError' === error?.name ) {
+			return false;
+		}
+
+		firstError = `${ error?.name }: ${ error?.message }`;
+	}
+
+	await new Promise( ( resolve ) => setTimeout( resolve, BEACON_RETRY_DELAY_MS ) );
+
+	try {
+		const forward = await send( { beacon_attempt: 2, beacon_first_error: firstError } );
+
+		return 'sent' === forward;
+	} catch ( error ) {
+		return false;
 	}
 };

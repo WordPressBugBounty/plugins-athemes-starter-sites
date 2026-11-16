@@ -192,7 +192,8 @@ export const getDemoPages = async( demoId, builder ) => {
 
 /**
  * Reduce a raw response body to a short, privacy-safe snippet for error
- * reporting: tags stripped, URLs redacted, whitespace collapsed, truncated.
+ * reporting: tags stripped, URLs, paths and email addresses redacted,
+ * whitespace collapsed, truncated.
  *
  * @param {string} body Raw response body.
  * @return {string} Sanitized snippet.
@@ -202,6 +203,8 @@ const sanitizeResponseSnippet = ( body ) => {
 		.replace( /<[^>]*>/g, ' ' )
 		.replace( /https?:\/\/\S+/gi, '[url]' )
 		.replace( /(?:[A-Za-z]:)?[\\/](?:[\w .@~-]+[\\/]){2,}[\w .@-]*/g, '[path]' )
+		// Bounded parts keep the email match linear on long runs of word characters.
+		.replace( /[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+/g, '[email]' )
 		.replace( /\s+/g, ' ' )
 		.trim()
 		.slice( 0, 160 );
@@ -263,8 +266,6 @@ export const importAjaxRequest = async( stepData ) => {
 			signal: controller.signal
 		});
 
-		clearTimeout( timeoutId );
-
 		// Hijacked request: 'opaqueredirect' in browsers (status 0), or a visible
 		// 3xx where redirects are not opaque (tests, non-browser fetch).
 		if ( 'opaqueredirect' === response.type || ( response.status >= 300 && response.status < 400 ) ) {
@@ -279,6 +280,15 @@ export const importAjaxRequest = async( stepData ) => {
 		if ( ! response.ok ) {
 			const httpError = new Error( `HTTP error! status: ${ response.status }` );
 			httpError.status = response.status;
+
+			// Keep a short, redacted body excerpt so a failed request can be
+			// diagnosed. The read stays inside the timeout window.
+			try {
+				httpError.responseSnippet = sanitizeResponseSnippet( await response.text() );
+			} catch ( readError ) {
+				httpError.responseSnippet = '';
+			}
+
 			throw httpError;
 		}
 
@@ -298,8 +308,6 @@ export const importAjaxRequest = async( stepData ) => {
 		}
 
 	} catch ( err ) {
-		clearTimeout( timeoutId );
-
 		// Re-throw abort errors with a cleaner name.
 		if ( 'AbortError' === err.name ) {
 			const timeoutError = new Error( `Request timed out after ${ timeoutMs / 1000 } seconds` );
@@ -308,5 +316,8 @@ export const importAjaxRequest = async( stepData ) => {
 		}
 
 		throw err;
+	} finally {
+		// Cleared only after the body is read, so a stalled body cannot hang.
+		clearTimeout( timeoutId );
 	}
 };

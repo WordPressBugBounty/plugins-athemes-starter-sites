@@ -535,6 +535,72 @@
 	}
 }
 
+// Complete state: what the import did not deliver
+.atss-complete-issues {
+	width: 100%;
+	max-width: 600px;
+	padding: var(--atss-spacing-md) var(--atss-spacing-xl);
+	border: 1px solid var(--atss-color-border-divider);
+	border-radius: var(--atss-radius-lg);
+	background-color: var(--atss-color-background-white);
+	text-align: start;
+
+	&__title {
+		margin: 0 0 var(--atss-spacing-xs);
+		font-size: var(--atss-font-size-base);
+		font-weight: 600;
+		color: var(--atss-color-text-heading);
+	}
+
+	&__list {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	&__item {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--atss-spacing-xs) var(--atss-spacing-md);
+		margin: 0;
+		padding: var(--atss-spacing-sm) 0;
+		font-size: var(--atss-font-size-sm);
+		color: var(--atss-color-text-secondary);
+
+		& + & {
+			border-top: 1px solid var(--atss-color-border-divider);
+		}
+	}
+
+	&__actions {
+		display: flex;
+		align-items: center;
+		gap: var(--atss-spacing-md);
+	}
+
+	&__link {
+		color: var(--atss-color-link);
+
+		&:is(:hover, :focus) {
+			color: var(--atss-color-link-hover);
+		}
+	}
+}
+
+// Beats the 52px height of the completion screen's buttons.
+.atss-onboarding-wizard__step--complete .atss-complete-issues__retry {
+	height: 36px;
+	font-size: var(--atss-font-size-sm);
+
+	// Matches the :disabled look of the wizard buttons; the button stays focusable.
+	&[aria-disabled="true"] {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}
+
 @keyframes atss-overlay-fade-in {
 	from {
 		opacity: 0;

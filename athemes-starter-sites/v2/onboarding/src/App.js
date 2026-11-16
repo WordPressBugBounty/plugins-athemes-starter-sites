@@ -70,6 +70,12 @@ function App() {
 	const [ showResumeModal, setShowResumeModal ] = useState( false );
 	const hasCheckedResume = useRef( false );
 
+	// True once the saved progress was checked after loading. Until then, and
+	// while the Resume modal is open, the current step is not mounted: a step
+	// mounted behind the modal would start its work (the Import step would
+	// start importing) before the user chose Resume or Restart.
+	const [ isResumeChecked, setIsResumeChecked ] = useState( false );
+
 	const [ isImporting, setIsImporting ] = useState( false );
 
 	const trackedViewedSteps = useRef( new Set() );
@@ -182,6 +188,7 @@ function App() {
 
 			// Mark as checked regardless of whether we showed the modal
 			hasCheckedResume.current = true;
+			setIsResumeChecked( true );
 		}
 	}, [ isLoading, completedSteps.length ] );
 
@@ -301,6 +308,11 @@ function App() {
 	 * @return {JSX.Element|null} The step component or null.
 	 */
 	const renderCurrentStep = () => {
+		// Not before the saved progress was checked, and not behind the Resume modal.
+		if ( ! isResumeChecked || showResumeModal ) {
+			return null;
+		}
+
 		const step = wizardSteps.find( ( s ) => s.id === currentStep );
 		if ( ! step || ! step.component ) {
 			return null;

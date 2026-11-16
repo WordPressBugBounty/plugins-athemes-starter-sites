@@ -3,7 +3,7 @@ Tags: athemes, elementor, demos, import, sites
 Requires at least: 4.0
 Tested up to: 7.0
 Requires PHP: 5.4
-Stable tag: 1.4.2
+Stable tag: 1.5.0
 Contributors: aThemes
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -67,6 +67,16 @@ Yes, of course! We are working on many more free and pro starter demos.
 Go to Plugins > Add New and search for aThemes Starter Sites. Install and activate it.
 
 == Changelog ==
+= 1.5.0 =
+* Added - Three new Sydney starter sites: Cleaning Services, Vacation Rental and Coffee Shop, with Gutenberg and Elementor support.
+* Added - Starter site imports now retry temporary failures automatically, and Try Again continues from the step that failed instead of starting over.
+* Added - The import completion screen lists any plugin or step that could not be imported, with a Retry button and a manual install link for plugins.
+* Fixed - The demo content download no longer fails on slow connections.
+* Fixed - A failed plugin install now reports its real error, and an interrupted install is repaired on the next attempt.
+* Fixed - Broken import and preview URLs for the Pet Shop, eLearning (Tutor) and Interior Design starter sites. The archived Original starter site was removed.
+* Fixed - A fatal error on the first headless Elementor import when Elementor was not active.
+* Fixed - Pages step cards stay in two columns when the page list scrolls.
+
 = 1.4.2 =
 * Added - Two new Sydney starter sites: Law Firm and Venue, with Gutenberg and Elementor support.
 * Added - Programmatic imports through the Abilities API now require an explicit confirmation flag.

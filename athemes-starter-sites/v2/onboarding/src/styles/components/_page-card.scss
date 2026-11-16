@@ -6,7 +6,8 @@
 	transition: all 0.2s ease;
 	display: flex;
 	flex-direction: column;
-	width: 136px;
+	width: 100%;
+	max-width: 136px;
 	height: 165px;
 	flex-shrink: 0;
 
@@ -18,7 +19,7 @@
 
 .atss-page-card__preview {
 	position: relative;
-	width: 136px;
+	width: 100%;
 	height: 129px;
 	overflow: hidden;
 	background-color: var(--atss-color-background-surface);
@@ -166,7 +167,8 @@
 
 .atss-pages-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, 136px);
+	// Fixed two columns that shrink when a sidebar scrollbar takes width, instead of auto-fill dropping to one column.
+	grid-template-columns: repeat(2, minmax(0, 136px));
 	gap: var(--atss-spacing-md) var(--atss-spacing-sm);
 	width: 100%;
 	justify-content: start;

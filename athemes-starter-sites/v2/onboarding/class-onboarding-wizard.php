@@ -337,6 +337,11 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 	public function ajax_apply_customizations() {
 		$this->verify_ajax_request();
 
+		if ( ! Athemes_Starter_Sites_Import_Lock::acquire() ) {
+			$this->discard_stray_output();
+			wp_send_json_error( 'import_step_in_progress' );
+		}
+
 		// Keep the response valid JSON even if a hook prints notices.
 		@ini_set( 'display_errors', '0' ); // phpcs:ignore WordPress.PHP.IniSet.display_errors_Disallowed, WordPress.PHP.NoSilencedErrors.Discouraged
 		ob_start();
@@ -345,8 +350,9 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		$state = $this->state_manager->get_state();
 
 		if ( empty( $state ) || ! isset( $state['data'] ) ) {
+			Athemes_Starter_Sites_Import_Lock::release();
 			$this->discard_stray_output();
-			wp_send_json_error( esc_html__( 'No wizard state found.', 'athemes-starter-sites' ), 400 );
+			wp_send_json_error( esc_html__( 'No wizard state found.', 'athemes-starter-sites' ) );
 		}
 
 		$data = $state['data'];
@@ -355,6 +361,8 @@ if ( ! class_exists( 'ATSS_Onboarding_Wizard' ) ) {
 		// Apply customizations via handler.
 		$site_title = isset( $data['siteTitle'] ) ? $data['siteTitle'] : '';
 		$this->customization_handler->apply_customizations( $customize_data, $site_title, $state );
+
+		Athemes_Starter_Sites_Import_Lock::release();
 
 		$this->discard_stray_output();
 

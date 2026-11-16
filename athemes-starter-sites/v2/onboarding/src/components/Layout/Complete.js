@@ -5,8 +5,8 @@
  * @package Athemes Starter Sites
  */
 
-import { __ } from '@wordpress/i18n';
-import { useState, useRef } from '@wordpress/element';
+import { __, _n, sprintf } from '@wordpress/i18n';
+import { useState, useRef, useEffect } from '@wordpress/element';
 import successIcon from '../../assets/images/success.svg';
 import successIconBotiga from '../../assets/images/success-botiga.svg';
 import linkIcon from '../../assets/images/link.svg';
@@ -46,10 +46,20 @@ function ExternalIcon() {
 	);
 }
 
-function Complete() {
+/**
+ * Complete component.
+ *
+ * @param {Object}   props               Component props.
+ * @param {Array}    props.issues        Issues of the import: what it did not deliver.
+ * @param {Function} props.onRetryPlugin Installs the plugin of a plugin Issue again, resolves true on success.
+ * @return {JSX.Element} Complete component.
+ */
+function Complete( { issues = [], onRetryPlugin = async () => false } ) {
 	const siteUrl = useRef( window.atssOnboarding?.homeUrl || window.location.origin );
 	const customizeUrl = window.atssOnboarding?.customizeUrl;
-	const wcSetupUrl = `${ siteUrl.current.replace( /\/$/, '' ) }/wp-admin/admin.php?page=wc-admin&path=/setup-wizard`;
+	// The admin base, taken from the AJAX URL: right when WordPress lives in a subdirectory.
+	const adminUrl = ( window.atssOnboarding?.ajaxUrl || '/wp-admin/admin-ajax.php' ).replace( /admin-ajax\.php.*$/, '' );
+	const wcSetupUrl = `${ adminUrl }admin.php?page=wc-admin&path=/setup-wizard`;
 	const dashboardUrl = window.atssOnboarding?.dashboardUrl;
 
 	const isWooOnboardingCompleted =
@@ -58,6 +68,118 @@ function Complete() {
 	const [ isIframeLoading, setIsIframeLoading ] = useState( true );
 	const [ isIframeError, setIsIframeError ] = useState( false );
 	const [ isHovering, setIsHovering ] = useState( false );
+
+	// Slugs of the plugin Issues a retry fixed, or that a retry did not fix.
+	const [ installedSlugs, setInstalledSlugs ] = useState( [] );
+	const [ failedSlugs, setFailedSlugs ] = useState( [] );
+
+	// Slug of the plugin being retried. One retry at a time: a second request
+	// would meet the import lock held by the first. The ref also blocks a
+	// click that arrives before the re-render.
+	const [ retryingSlug, setRetryingSlug ] = useState( null );
+	const isRetryingRef = useRef( false );
+
+	// Outcome of the last retry, read out by the live region.
+	const [ retryStatus, setRetryStatus ] = useState( '' );
+
+	// Focus targets after a successful retry removes its row.
+	const mainHeadingRef = useRef( null );
+	const issuesHeadingRef = useRef( null );
+	const retryButtonRefs = useRef( {} );
+	const pendingFocusRef = useRef( null );
+
+	const stepIssueLabels = {
+		atss_import_widgets: __( 'Widgets were not imported.', 'athemes-starter-sites' ),
+		atss_import_customizer: __( 'Theme settings from the starter site were not imported.', 'athemes-starter-sites' ),
+		atss_apply_wizard_customizations: __( 'Your logo, colors and fonts were not applied. Set them in the Customizer.', 'athemes-starter-sites' ),
+	};
+
+	const getStepIssueLabel = ( issue ) => (
+		stepIssueLabels[ issue.action ] || __( 'One import step could not be completed.', 'athemes-starter-sites' )
+	);
+
+	const getPluginName = ( issue ) => issue.name || issue.slug;
+
+	const openIssues = issues.filter( ( issue ) => 'plugin' !== issue.type || ! installedSlugs.includes( issue.slug ) );
+
+	// Runs after a successful retry removed its row, so the target is rendered.
+	useEffect( () => {
+		const target = pendingFocusRef.current;
+
+		if ( ! target ) {
+			return;
+		}
+
+		pendingFocusRef.current = null;
+
+		let element = mainHeadingRef.current;
+
+		if ( 'retry' === target.type ) {
+			element = retryButtonRefs.current[ target.slug ];
+		} else if ( 'issues' === target.type ) {
+			element = issuesHeadingRef.current;
+		}
+
+		element?.focus();
+	}, [ installedSlugs ] );
+
+	/**
+	 * Where focus goes once a plugin's row is removed: the next Retry button,
+	 * else the nearest one above, else the issues heading while other Issues
+	 * remain, else the main heading.
+	 *
+	 * @param {Object} issue The plugin Issue whose row is removed.
+	 * @return {Object} The focus target.
+	 */
+	const getFocusTargetAfter = ( issue ) => {
+		const pluginIssues = openIssues.filter( ( open ) => 'plugin' === open.type );
+		const index = pluginIssues.findIndex( ( open ) => open.slug === issue.slug );
+		const nextIssue = pluginIssues[ index + 1 ] || pluginIssues[ index - 1 ];
+
+		if ( nextIssue ) {
+			return { type: 'retry', slug: nextIssue.slug };
+		}
+
+		return { type: openIssues.length > 1 ? 'issues' : 'main' };
+	};
+
+	const handleRetryPlugin = async ( issue ) => {
+		if ( isRetryingRef.current ) {
+			return;
+		}
+
+		isRetryingRef.current = true;
+		setRetryingSlug( issue.slug );
+		setRetryStatus( '' );
+
+		let isInstalled = false;
+
+		try {
+			isInstalled = true === await onRetryPlugin( issue );
+		} catch ( err ) {
+			isInstalled = false;
+		}
+
+		isRetryingRef.current = false;
+		setRetryingSlug( null );
+
+		if ( isInstalled ) {
+			setRetryStatus( sprintf(
+				/* translators: %s: plugin name. */
+				__( '%s was installed.', 'athemes-starter-sites' ),
+				getPluginName( issue )
+			) );
+			pendingFocusRef.current = getFocusTargetAfter( issue );
+			setInstalledSlugs( ( slugs ) => [ ...slugs, issue.slug ] );
+		} else {
+			setRetryStatus( sprintf(
+				/* translators: %s: plugin name. */
+				__( '%s could not be installed.', 'athemes-starter-sites' ),
+				getPluginName( issue )
+			) );
+			setFailedSlugs( ( slugs ) => ( slugs.includes( issue.slug ) ? slugs : [ ...slugs, issue.slug ] ) );
+		}
+	};
 
 	const handleViewSite = () => {
 		window.open( siteUrl.current, '_blank' );
@@ -164,13 +286,106 @@ function Complete() {
 						</div>
 
 						<div className="atss-complete__header">
-							<h2 className="atss-onboarding-wizard__step-body-title text-xl font-medium">
+							<h2
+								ref={ mainHeadingRef }
+								className="atss-onboarding-wizard__step-body-title text-xl font-medium"
+								tabIndex={ -1 }
+							>
 								{ themeText.wizardTitle }
 							</h2>
 							<p className="atss-onboarding-wizard__step-body-description text-sm text-secondary">
 								{ themeText.wizardDescription }
 							</p>
 						</div>
+
+						{ openIssues.length > 0 && (
+							<div className="atss-complete-issues">
+								<h3 ref={ issuesHeadingRef } className="atss-complete-issues__title" tabIndex={ -1 }>
+									{ sprintf(
+										/* translators: %d: number of items that need attention. */
+										_n(
+											'Your site is ready, with %d item that needs attention',
+											'Your site is ready, with %d items that need attention',
+											openIssues.length,
+											'athemes-starter-sites'
+										),
+										openIssues.length
+									) }
+								</h3>
+
+								<ul className="atss-complete-issues__list">
+									{ openIssues.map( ( issue ) => {
+										if ( 'plugin' !== issue.type ) {
+											return (
+												<li key={ `step:${ issue.action }` } className="atss-complete-issues__item">
+													<span className="atss-complete-issues__text">
+														{ getStepIssueLabel( issue ) }
+													</span>
+												</li>
+											);
+										}
+
+										const isRetrying = retryingSlug === issue.slug;
+
+										return (
+											<li
+												key={ `plugin:${ issue.slug }` }
+												className="atss-complete-issues__item"
+												aria-busy={ isRetrying }
+											>
+												<span className="atss-complete-issues__text">
+													{ sprintf(
+														/* translators: %s: plugin name. */
+														__( '%s could not be installed.', 'athemes-starter-sites' ),
+														getPluginName( issue )
+													) }
+												</span>
+
+												<span className="atss-complete-issues__actions">
+													{ failedSlugs.includes( issue.slug ) && (
+														<a
+															href={ `${ adminUrl }plugin-install.php?tab=search&type=term&s=${ encodeURIComponent( issue.slug ) }` }
+															className="atss-complete-issues__link"
+															target="_blank"
+															rel="noopener noreferrer"
+														>
+															{ __( 'Install manually', 'athemes-starter-sites' ) }
+														</a>
+													) }
+
+													{ /* aria-disabled, not disabled: the button keeps focus while a retry runs. */ }
+													<button
+														ref={ ( element ) => {
+															retryButtonRefs.current[ issue.slug ] = element;
+														} }
+														type="button"
+														className="atss-onboarding-wizard__btn atss-onboarding-wizard__btn--skip atss-complete-issues__retry"
+														aria-disabled={ null !== retryingSlug }
+														aria-label={ sprintf(
+															/* translators: %s: plugin name. */
+															__( 'Retry %s', 'athemes-starter-sites' ),
+															getPluginName( issue )
+														) }
+														onClick={ () => handleRetryPlugin( issue ) }
+													>
+														{ isRetrying ?
+															__( 'Retrying…', 'athemes-starter-sites' ) :
+															__( 'Retry', 'athemes-starter-sites' ) }
+													</button>
+												</span>
+											</li>
+										);
+									} ) }
+								</ul>
+							</div>
+						) }
+
+						{ /* Outside the issues block, so it outlives the block when the last Issue is fixed. */ }
+						{ issues.length > 0 && (
+							<p className="screen-reader-text" role="status" aria-live="polite">
+								{ retryStatus }
+							</p>
+						) }
 
 						{ ! isBotiga && (
 							<>

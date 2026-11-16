@@ -7,6 +7,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from '@wordpress/element';
 import wizardSteps from '../data/wizard-steps';
 import { getWizardState, saveWizardState, deleteWizardState } from '../utils/api';
+import { isImportRunning } from '../utils/import-run-state';
 
 const WizardContext = createContext();
 
@@ -43,6 +44,13 @@ export const WizardProvider = ( { children } ) => {
 	const [ isImportComplete, setIsImportComplete ] = useState( false );
 	const [ isHistoryInitialized, setIsHistoryInitialized ] = useState( false );
 	const isHandlingPopState = useRef( false );
+
+	// The current step, for the popstate handler registered once on mount.
+	const currentStepRef = useRef( state.currentStep );
+
+	useEffect( () => {
+		currentStepRef.current = state.currentStep;
+	}, [ state.currentStep ] );
 
 	/**
 	 * Load initial state from the database.
@@ -117,6 +125,17 @@ export const WizardProvider = ( { children } ) => {
 	 */
 	useEffect( () => {
 		const handlePopState = ( event ) => {
+			// Leaving the Import step would unmount a running import: stay on
+			// the current step and put its history entry back.
+			if ( isImportRunning() ) {
+				window.history.pushState(
+					{ wizardStep: currentStepRef.current },
+					'',
+					window.location.href
+				);
+				return;
+			}
+
 			if ( event.state && typeof event.state.wizardStep === 'number' ) {
 				// Set flag to prevent history push when we update state
 				isHandlingPopState.current = true;

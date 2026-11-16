@@ -52,6 +52,11 @@ function Navigation( {
 	 * @return {boolean} Whether the step is accessible.
 	 */
 	const isStepAccessible = ( stepId ) => {
+		// A step change would unmount a running import.
+		if ( isImporting ) {
+			return false;
+		}
+
 		// First step is always accessible.
 		if ( stepId === 1 ) {
 			return true;

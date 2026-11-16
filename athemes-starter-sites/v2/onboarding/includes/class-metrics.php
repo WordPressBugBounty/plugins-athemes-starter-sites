@@ -73,11 +73,16 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 
 			$this->discard_stray_output();
 
-			wp_send_json_success(
-				array(
-					'status' => $status,
-				)
+			$response = array(
+				'status' => $status,
 			);
+
+			if ( $this->is_confirmed_event( $event_name ) ) {
+				// The client waits on this to know the completion beacon landed.
+				$response['forward'] = ( 'sent' === $status ) ? 'sent' : 'failed';
+			}
+
+			wp_send_json_success( $response );
 		}
 
 		/**
@@ -127,6 +132,17 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 		}
 
 		/**
+		 * Check whether the event needs a confirmed (blocking) forward. Only the
+		 * completion beacon reads the confirmation.
+		 *
+		 * @param string $event_name Event name.
+		 * @return bool
+		 */
+		private function is_confirmed_event( $event_name ) {
+			return 'onboarding_import_completed' === $event_name;
+		}
+
+		/**
 		 * Get metadata from the AJAX request.
 		 *
 		 * @return array
@@ -166,6 +182,12 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 				'error_message',
 				'http_status',
 				'plugin_slug',
+				'response_snippet',
+				'import_attempt',
+				'retry_count',
+				'failed_items_count',
+				'beacon_attempt',
+				'beacon_first_error',
 			);
 
 			$sanitized_metadata = array();
@@ -186,15 +208,23 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 					case 'selected_pages_count':
 					case 'selected_plugins_count':
 					case 'http_status':
+					case 'import_attempt':
+					case 'retry_count':
+					case 'failed_items_count':
+					case 'beacon_attempt':
 						$sanitized_metadata[ $key ] = absint( $value );
 						break;
 
 					case 'error_message':
-						// Redact URLs and filesystem paths here rather than relying on
-						// the client having run metrics.js's sanitizeMetadata first:
-						// error_message is forwarded off-site by send_event().
+					case 'response_snippet':
+					case 'beacon_first_error':
+						// Redact URLs, filesystem paths and email addresses here rather
+						// than relying on the client having run metrics.js's
+						// sanitizeMetadata first: error_message is forwarded off-site
+						// by send_event().
 						$value                      = preg_replace( '#https?://\S+#i', '[url]', (string) $value );
 						$value                      = preg_replace( '#(?:[A-Za-z]:)?[\\\\/](?:[\w .@~-]+[\\\\/]){2,}[\w .@-]*#', '[path]', (string) $value );
+						$value                      = preg_replace( '#[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63})+#', '[email]', (string) $value );
 						$value                      = sanitize_text_field( $value );
 						$sanitized_metadata[ $key ] = function_exists( 'mb_substr' ) ? mb_substr( $value, 0, 300 ) : substr( $value, 0, 300 );
 						break;
@@ -256,9 +286,12 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 				return 'skipped';
 			}
 
+			// The completion event is awaited so the client can confirm delivery.
+			$is_confirmed = isset( $payload['event_name'] ) && $this->is_confirmed_event( $payload['event_name'] );
+
 			$request_args = array(
-				'timeout'    => 5,
-				'blocking'   => false,
+				'timeout'    => $is_confirmed ? 3 : 5,
+				'blocking'   => $is_confirmed,
 				'user-agent' => 'aThemes Starter Sites/' . $this->get_plugin_version() . '; aThemes',
 				'headers'    => array(
 					'Content-Type' => 'application/json',
@@ -274,9 +307,19 @@ if ( ! class_exists( 'ATSS_Onboarding_Metrics' ) ) {
 			 */
 			$request_args = apply_filters( 'atss_onboarding_metrics_request_args', $request_args, $payload );
 
-			wp_remote_post( $endpoint, $request_args );
+			$response = wp_remote_post( $endpoint, $request_args );
 
-			return 'queued';
+			if ( ! $is_confirmed ) {
+				return 'queued';
+			}
+
+			if ( is_wp_error( $response ) ) {
+				return 'failed';
+			}
+
+			$code = (int) wp_remote_retrieve_response_code( $response );
+
+			return ( $code >= 200 && $code < 300 ) ? 'sent' : 'failed';
 		}
 
 		/**
